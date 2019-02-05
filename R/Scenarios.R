@@ -92,23 +92,17 @@ get.data <- function(iti,samplesize, conmode, endtime=50,ratDiv){
   data_out <- dat[,names(dat) %in% c("ID",wnames,"A","T.tilde","Delta" )]
   
   dat2 <- sim(setD,n=20000,rndseed= 12345)
-  true.func.1 <- function(x,points,ratDiv=ratDiv){
+  
+  true.func <- function(x,points,ratDiv=ratDiv,A){
     x <- as.matrix(x,nrow=1)
-    rate <- as.numeric(x[5]+x[6]+x[7]+x[8]+x[1]+x[2]+x[3]+x[4])
+    rate <- as.numeric(x[5]+x[6]+x[7]+x[8]+x[1]+x[2]+x[3]+x[4]+A*(x[1]+x[2]+x[3]+x[4]))
     s_diff_true <-  exp(-rate/ratDiv*seq(0,points,1))
     return(s_diff_true)
   }
   
-  true.func.0 <- function(x,points,ratDiv=ratDiv){
-    x <- as.matrix(x,nrow=1)
-    rate <- as.numeric(x[5]+x[6]+x[7]+x[8])
-    s_diff_true <-  exp(-rate/ratDiv*seq(0,points,1))
-    return(s_diff_true)
-  }
 
   return(list(dat = as.data.frame(data_out), wnames = wnames,
-              true_surv1 = true.func.1, 
-              true_surv0 = true.func.0,
+              true_surv = true.func, 
               dat2 = dat2))
 }
 
