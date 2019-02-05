@@ -1,9 +1,9 @@
-
-simulated <- get.data(iti=51234,samplesize=1000, conmode ="scenario 3", endtime=50,ratDiv=400)
+n_sim = 5000
+simulated <- get.data(iti=51234,samplesize=n_sim, conmode ="scenario 3", endtime=50,ratDiv=50)
 df <- simulated$dat
 true_surv <- simulated$true_surv1
 adjustVars <- simulated$wnames
-nsim = 1000
+
 
 sl_lib_g <- c("SL.mean", "SL.glm", "SL.gam")
 sl_lib_censor <- c("SL.mean", "SL.glm", "SL.gam", "SL.earth")
@@ -95,6 +95,21 @@ psi_moss_0 <- moss_fit$onestep_curve(
 moss_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_1)
 moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
 
+#survival_truth_1 <- survival_curve$new(t = k_grid, survival = simulated$true_surv1(k_grid - 1))
+#survival_truth_0 <- survival_curve$new(t = k_grid, survival = simulated$true_surv0(k_grid - 1))
+controls <- simulated$dat2[,grep("W",names(simulated$dat2),value = T)]
+true.1 <- t(apply(controls, 1, function(x) simulated$true_surv1(x,150,ratDiv=50)))
+true.0 <- t(apply(controls, 1, function(x) simulated$true_surv0(x,150,ratDiv=50)))
+
+
+plot(km_fit_1$survival %>% t(), lty = 1,type = 'l',col = 'darkgreen')
+lines(km_fit_0$survival %>% t(), lty = 1,type = 'l',col = 'green')
+lines(sl_density_failure_1_marginal$survival %>% t(), lty = 2,type = 'l',col = 'red')
+lines(sl_density_failure_0_marginal$survival %>% t(), lty = 2,type = 'l',col = 'blue')
+lines(moss_fit_1$survival %>% t(), lty = 1,type = 'l',col = 'red')
+lines(moss_fit_0$survival %>% t(), lty = 2,type = 'l',col = 'blue')
+lines(colMeans(true.1), lty = 1,type = 'l')
+lines(colMeans(true.0), lty = 2,type = 'l')
 
 
 
