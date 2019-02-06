@@ -1,7 +1,10 @@
-n_sim = 2000
-simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3", endtime=50,ratDiv=115)
+n_sim = 5000
+rate = 110
+simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3", endtime=50,ratDiv=rate)
 #simulated <- simulate_data(n_sim = n_sim)
 df <- simulated$dat
+df <- df[df$T.tilde<=100 & df$T.tilde>0,]
+df <- df[complete.cases(df),]
 adjustVars <- simulated$wnames
 
 
@@ -51,10 +54,12 @@ moss_fit <- MOSS$new(
 )
 psi_moss_1 <- moss_fit$onestep_curve(
   epsilon = 1e-1 / n_sim,
-  # epsilon = 1e-5,
+  #epsilon = 1e-2,
   max_num_interation = 5e1,
   verbose = T
 )
+moss_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_1)
+
 moss_fit <- MOSS$new(
   A = df$A,
   T_tilde = df$T.tilde,
@@ -71,14 +76,13 @@ psi_moss_0 <- moss_fit$onestep_curve(
   max_num_interation = 5e1,
   verbose = T
 )
-moss_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_1)
 moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
 
 #survival_truth_1 <- survival_curve$new(t = k_grid, survival = simulated$true_surv1(k_grid - 1))
 #survival_truth_0 <- survival_curve$new(t = k_grid, survival = simulated$true_surv0(k_grid - 1))
 controls <- simulated$dat2[,grep("W",names(simulated$dat2),value = T)]
-true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,100,ratDiv=115,A=1)))
-true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,100,ratDiv=115,A=0)))
+true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,100,ratDiv=rate,A=1)))
+true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,100,ratDiv=rate,A=0)))
 
 
 plot(sl_density_failure_1_marginal$survival %>% t(), lty = 2,type = 'l',col = 'red')
@@ -92,4 +96,23 @@ lines(colMeans(true.1), lty = 1,type = 'l')
 lines(colMeans(true.0), lty = 1,type = 'l')
 
 
+
+
+moss_hazard_ate_fit <- MOSS_hazard_ate$new(
+  A = df$A,
+  T_tilde = df$T.tilde,
+  Delta = df$Delta,
+  density_failure = sl_fit$density_failure_1,
+  density_censor = sl_fit$density_censor_1,
+  density_failure_0 = sl_fit$density_failure_0,
+  density_censor_0 = sl_fit$density_censor_0,
+  g1W = sl_fit$g1W,
+  k_grid = k_grid
+)
+psi_moss_hazard_ate_1 <- moss_hazard_ate_fit$iterate_onestep(
+  epsilon = 1e-2, max_num_interation = 1e1, verbose = T)
+moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_hazard_ate_1)
+moss_hazard_ate_fit_1$survival
+moss_fit_1$survival-moss_fit_0$survival
+survival_truth_1$survival-survival_truth_0$survival
 

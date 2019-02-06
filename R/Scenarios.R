@@ -79,7 +79,7 @@ get.data <- function(iti,samplesize, conmode, endtime=50,ratDiv){
   D <- D+
     node("rate1", distr = "rconst", const = rate/ratDiv) +
     node("Trexp", distr = "rexp", rate = rate1) +
-    node("Cweib", distr = "rweibull", shape = .8 - .1*W1, scale = 20) +
+    node("Cweib", distr = "rweibull", shape = .8 - .01*(rnorm(1)), scale = 20) +
     node("T", distr = "rconst", const = round(Trexp,0)) +
     node("C", distr = "rconst", const = round(Cweib,0)) +
     #node("C", distr = "rconst", const = T+1) +
