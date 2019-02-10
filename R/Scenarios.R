@@ -30,7 +30,7 @@ get.data <- function(iti,samplesize, conmode, endtime=50,ratDiv){
       node("rate",distr = "rconst", const = (W5+W6+W7+W8+W1+W2+W3+W4)+(W1+W2+W3+W4)*A)
     wnames <- c('W1','W2','W3','W4','W5','W6','W7','W8','W9','W10')
   }else if(conmode == "scenario 3"){
-    D <- D+ node("odds",distr = "rconst", const = 0.2+log(1.2)*W1+log(1.2)*W2+log(2)*W3+log(2)*W4+log(1.2)*W5+log(1.2)*W6+log(2)*W7+log(2)*W8)+
+    D <- D+ node("odds",distr = "rconst", const = 0.2+W1+W2+2*W3+2*W4+W5+W6+W7+W8)+
       node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
       node("rate",distr = "rconst", const = (W5+W6+W7+W8+W1+W2+W3+W4)+(W1+W2+W3+W4)*A)
     wnames <- c('W1','W2','W3','W4','W5','W6','W7','W8','W9','W10')
