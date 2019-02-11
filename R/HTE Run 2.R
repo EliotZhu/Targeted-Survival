@@ -1,21 +1,19 @@
-n_sim = 1000
-rate = 50
-simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3", endtime=50,ratDiv=rate)
+n_sim = 2000
+rate = 1
+simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=rate)
 #simulated <- simulate_data(n_sim = n_sim)
 df <- simulated$dat
-df <- df[df$T.tilde<=30 & df$T.tilde>0,]
+df <- df[df$T.tilde<=50 & df$T.tilde>0,]
 df <- df[complete.cases(df),]
 adjustVars <- simulated$wnames
-
-
-mean(df$W4[df$A==1])
-mean(df$W4[df$A==0])
+eventrate <- table(df$Delta[df$T.tilde<12])/nrow(df)
+eventrate
 
 
 sl_lib_g <- c("SL.mean", "SL.glm", "SL.gam")
 sl_lib_censor <- c("SL.mean", "SL.glm", "SL.gam", "SL.earth")
 sl_lib_failure <- c("SL.mean", "SL.glm", "SL.gam", "SL.earth")
-eventrate <- table(df$Delta[df$T.tilde<12])/nrow(df)
+
 df$T.tilde <- df$T.tilde + 1
 k_grid <- 1:max(df$T.tilde)
 
@@ -58,7 +56,7 @@ moss_fit <- MOSS$new(
   k_grid = k_grid
 )
 psi_moss_1 <- moss_fit$onestep_curve(
-  epsilon = 1e-1 / n_sim,
+  epsilon = 1 / n_sim,
   #epsilon = 1e-2,
   max_num_interation = 5e1,
   verbose = T
@@ -76,7 +74,7 @@ moss_fit <- MOSS$new(
   k_grid = k_grid
 )
 psi_moss_0 <- moss_fit$onestep_curve(
-  epsilon = 1e-1 / n_sim,
+  epsilon = 1 / n_sim,
   # epsilon = 1e-5,
   max_num_interation = 5e1,
   verbose = T
@@ -85,7 +83,7 @@ moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
 
 #survival_truth_1 <- survival_curve$new(t = k_grid, survival = simulated$true_surv1(k_grid - 1))
 #survival_truth_0 <- survival_curve$new(t = k_grid, survival = simulated$true_surv0(k_grid - 1))
-controls <- simulated$dat2[,grep("W",names(simulated$dat2),value = T)]
+controls <- df[,grep("W",names(df),value = T)]
 true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,100,ratDiv=rate,A=1)))
 true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,100,ratDiv=rate,A=0)))
 
@@ -120,13 +118,13 @@ plot(sl_density_failure_1_marginal$survival %>% t(), lty = 2,type = 'l',col = 'r
 lines(sl_density_failure_0_marginal$survival %>% t(), lty = 2,type = 'l',col = 'blue')
 lines(moss_fit_1$survival %>% t(), lty = 1,type = 'l',col = 'red')
 lines(moss_fit_0$survival %>% t(), lty = 1,type = 'l',col = 'blue')
-lines(ipcw_fit_1$survival %>% t(), lty = 4,type = 'l',col = 'red')
-lines(ipcw_fit_0$survival %>% t(), lty = 4,type = 'l',col = 'blue')
+#lines(ipcw_fit_1$survival %>% t(), lty = 4,type = 'l',col = 'green')
+#lines(ipcw_fit_0$survival %>% t(), lty = 4,type = 'l',col = 'green')
 #lines(survival_truth_1$survival%>% t(), lty = 2,type = 'l')
 #lines(survival_truth_0$survival%>% t(), lty = 2,type = 'l')
 
-lines(colMeans(true.1), lty = 1,type = 'l')
-lines(colMeans(true.0), lty = 1,type = 'l')
+lines(colMeans(true.1), lty = 2,type = 'l')
+lines(colMeans(true.0), lty = 3,type = 'l')
 
 
 

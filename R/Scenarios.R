@@ -5,7 +5,7 @@ library(survival,simsurv)
 library(survminer)
 library(simcausal)
 
-get.data <- function(iti,samplesize, conmode, endtime=50,ratDiv){
+get.data <- function(iti,samplesize, conmode,ratDiv){
   D <- DAG.empty()
   D <- D +
     node("W1", distr ="rbinom", prob = .5,size=1)+
@@ -19,25 +19,18 @@ get.data <- function(iti,samplesize, conmode, endtime=50,ratDiv){
     node("W9", distr ="runif", min = 0, max = 1)+
     node("W10", distr ="runif", min = 0, max = 1)
 
-  if (conmode == "scenario 1"){
-    D <- D+ node("odds",distr = "rconst", const = 0.2+log(1.2)*W1+log(1.2)*W2)+
-      node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
-      node("rate",distr = "rconst", const = (W5+W6+W7+W8+W1+W2+W3+W4)+(W1+W2+W3+W4)*A)
+  if(conmode == "scenario 3"){
+    D <- D+ node("odds",distr = "rconst", const = 0.2+W1+W2+W3+W4)+
+        node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
+        node("rate",distr = "rconst", const = (W1+W2+W5+W6)*A+W3+W4+W7+W8)+
+        node("Cweib", distr = "rweibull", shape = .1+(W5+W6+W7+W8)/5, scale = 50) 
     wnames <- c('W1','W2','W3','W4','W5','W6','W7','W8','W9','W10')
-  }else if(conmode == "scenario 2"){
-    D <- D+ node("odds",distr = "rconst", const = 0.2+log(1.2)*W1+log(1.2)*W2+log(2)*W3+log(2)*W4)+
-      node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
-      node("rate",distr = "rconst", const = (W5+W6+W7+W8+W1+W2+W3+W4)+(W1+W2+W3+W4)*A)
-    wnames <- c('W1','W2','W3','W4','W5','W6','W7','W8','W9','W10')
-  }else if(conmode == "scenario 3"){
-    D <- D+ node("odds",distr = "rconst", const = 0.2+W1+W2+2*W3+2*W4+W5+W6+W7+W8)+
-      node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
-      node("rate",distr = "rconst", const = (W5+W6+W7+W8+W1+W2+W3+W4)+(W1+W2+W3+W4)*A)
-    wnames <- c('W1','W2','W3','W4','W5','W6','W7','W8','W9','W10')
+    
   }else if(conmode == "no"){
-    D <- D+ node("odds",distr = "rconst", const = 1)+
-      node("A", distr = "rbinom", size = 1, prob = .5) +
-      node("rate",distr = "rconst", const = (W5+W6+W7+W8+W1+W2+W3+W4)+(W1+W2+W3+W4)*A)
+    D <- D+ node("odds",distr = "rconst", const = 0.2)+
+      node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
+      node("rate",distr = "rconst", const = (W1+W2+W5+W6)*A+W3+W4+W7+W8)+
+      node("Cweib", distr = "rweibull", shape = .1+(W5+W6+W7+W8)/5, scale = 50) 
     wnames <- c('W1','W2','W3','W4','W5','W6','W7','W8','W9','W10')
   }else if(conmode == "scenario 3.1"){
     D <- D+ node("odds",distr = "rconst", const = 0.2+log(1.2)*W1+log(1.2)*W2+log(2)*W3+log(2)*W4+log(1.2)*W5+log(1.2)*W6+log(2)*W7+log(2)*W8)+
@@ -78,11 +71,9 @@ get.data <- function(iti,samplesize, conmode, endtime=50,ratDiv){
 
   D <- D+
     node("rate1", distr = "rconst", const = rate/ratDiv) +
-    node("Trexp", distr = "rexp", rate = rate1) +
-    node("Cweib", distr = "rweibull", shape = .8 - .01*(rnorm(1)), scale = 20) +
-    node("T", distr = "rconst", const = round(Trexp,0)) +
-    node("C", distr = "rconst", const = round(Cweib,0)) +
-    #node("C", distr = "rconst", const = T+1) +
+    node("Trexp", distr = "rlnorm", meanlog = rate1, sdlog = .1) +
+    node("T", distr = "rconst", const = round(Trexp)) +
+    node("C", distr = "rconst", const = round(Cweib)) +
     node("T.tilde", distr = "rconst", const = ifelse(T <= C , T, C)) +
     node("Delta", distr = "rconst", const = ifelse(T <= C , 1, 0))
   setD <- set.DAG(D)
@@ -95,8 +86,10 @@ get.data <- function(iti,samplesize, conmode, endtime=50,ratDiv){
   
   true.func <- function(x,points,ratDiv=ratDiv,A){
     x <- as.matrix(x,nrow=1)
-    rate <- as.numeric(x[5]+x[6]+x[7]+x[8]+x[1]+x[2]+x[3]+x[4]+A*(x[1]+x[2]+x[3]+x[4]))
-    s_diff_true <-  exp(-rate/ratDiv*seq(0,points,1))
+    rate <- as.numeric(x[7]+x[8]+x[3]+x[4]+A*(x[1]+x[2]+x[5]+x[6]))
+    s_diff_true <-  1 - plnorm(q, meanlog = rate/ratDiv, sdlog = .1)
+      
+      exp(-rate/ratDiv*seq(0,points,1))
     return(s_diff_true)
   }
   
