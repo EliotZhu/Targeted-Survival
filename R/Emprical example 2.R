@@ -1,7 +1,9 @@
-data_out <- Elliott[,c('gender',"age","imd2015","paroxysmal","persistent","chronic",
-                      "typical_flutter","atypical_flutter","af_hospital","mi_count","chf_count","pvd_count","cvd_count","dem_count",
-                      "copd_count","rhe_count","giu_count","hp_count","ckd_count",
+
+data_out <- Blanca[,c('female',"age","imd2015","prev_vka","af_hospital","mi_count",
+                      "chf_count","pvd_count","cvd_count","dem_count","copd_count","rhe_count","dtm_u_count","dtm_c_count",
+                      "ckd_count","can_count","charlson_index_2y","vas_count","hyp_count",
                       "chadvasc_index_2y","bleed_count","alch_count","nsaid_asp_count","l_inr_count","hasbled_index_2y")]
+
 data_out[is.na(data_out)] <- 0
 data_out <- as.data.frame(apply(data_out, 2, as.numeric))
 apply(data_out, 2,function(x) round(length(which(x==0))/length(x)*100,4))
@@ -14,6 +16,21 @@ normalise <-  function(x){
   }
 }
 data_out <- as.data.frame(apply(data_out,2,function(x) normalise(x)))
+
+
+
+names(data_out) <- paste("W",names(data_out),sep = "_")
+adjustVars <- names(data_out)
+Blanca$combodate <- as.Date(Blanca$combodate, "%Y-%m-%d")
+Blanca$af_start <- as.Date(Blanca$af_start, "%Y-%m-%d")
+Blanca$af_end <- as.Date(Blanca$af_end, "%Y-%m-%d")
+follow_up <- Blanca$af_end-Blanca$af_start
+event_time <- Blanca$combodate-Blanca$af_start
+data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+data_out$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
+data_out$T.tilde <- round(data_out$T.tilde/180)
+data_out <- data_out[data_out$T.tilde<=200 & data_out$T.tilde>0,]
 
 
 names(data_out) <- paste("W",names(data_out),sep = "_")
@@ -29,6 +46,8 @@ data_out$A <- Elliott$anticoagulant
 data_out$T.tilde <- round(data_out$T.tilde/180)
 data_out <- data_out[data_out$T.tilde<=200 & data_out$T.tilde>0,]
 
+
+
 table(data_out$T.tilde)
 hist(data_out$T.tilde)
 
@@ -39,12 +58,15 @@ table(data_out$A)/nrow(data_out)
 #data_out <- data_out[idx,]
 data_out <- data_out[complete.cases(data_out),]
 df <- data_out
-sl_lib_g <- c("SL.mean", "SL.glm","SL.earth")
-sl_lib_censor <- c("SL.mean", "SL.glm","SL.earth")
-sl_lib_failure <- c("SL.mean", "SL.glm","SL.earth")
+sl_lib_g <- c("SL.mean", "SL.glm")
+sl_lib_censor <- c("SL.mean", "SL.glm")
+sl_lib_failure <- c("SL.mean", "SL.glm")
+eventrate <- table(df$Delta[df$T.tilde<12])/nrow(df)
 df$T.tilde <- df$T.tilde + 1
 k_grid <- 1:max(df$T.tilde)
 n_sim <- nrow(df)
+
+
 
 
 library(MOSS)
@@ -71,56 +93,122 @@ sl_density_failure_1_marginal <- sl_fit$density_failure_1$clone(deep = TRUE)
 sl_density_failure_0_marginal <- sl_fit$density_failure_0$clone(deep = TRUE)
 sl_density_failure_1_marginal$survival <- matrix(colMeans(sl_density_failure_1_marginal$survival), nrow = 1)
 sl_density_failure_0_marginal$survival <- matrix(colMeans(sl_density_failure_0_marginal$survival), nrow = 1)
-ITE <- sl_fit$density_failure_1$survival-sl_fit$density_failure_0$survival
+message("moss")
+
+plot(sl_fit$density_failure_1$hazard/sl_fit$density_failure_0$hazard)[,14]
 
 
-eic_fit <- eic$new(
-  A = self$A,
-  T_tilde = self$T_tilde,
-  Delta = self$Delta,
-  density_failure = self$density_failure,
-  density_censor = self$density_censor,
-  g1W = self$g1W,
-  psi = psi_n,
-  A_intervene = self$A_intervene
-)$all_t(k_grid = k_grid)
-mean_eic <- colMeans(eic_fit)
+moss_fit <- MOSS$new(
+  A = df$A,
+  T_tilde = df$T.tilde,
+  Delta = df$Delta,
+  density_failure = sl_fit$density_failure_1,
+  density_censor = sl_fit$density_censor_1,
+  g1W = sl_fit$g1W,
+  A_intervene = 1,
+  k_grid = k_grid
+)
+psi_moss_1 <- moss_fit$onestep_curve(
+  epsilon = 1e-1 / n_sim,
+  #epsilon = 1e-2,
+  max_num_interation = 1e1,
+  verbose = T
+)
+moss_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_1)
+
+moss_fit <- MOSS$new(
+  A = df$A,
+  T_tilde = df$T.tilde,
+  Delta = df$Delta,
+  density_failure = sl_fit$density_failure_0,
+  density_censor = sl_fit$density_censor_0,
+  g1W = sl_fit$g1W,
+  A_intervene = 0,
+  k_grid = k_grid
+)
+psi_moss_0 <- moss_fit$onestep_curve(
+  epsilon = 1e-1 / n_sim,
+  # epsilon = 1e-5,
+  max_num_interation = 1e1,
+  verbose = T
+)
+moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
+
+
+# ipcw
+message("ipcw + ee")
+ipcw_fit_1_all <- repeat_t_grid$new(
+  method = ipcw,
+  A = df$A,
+  T_tilde = df$T.tilde,
+  Delta = df$Delta,
+  density_failure = sl_fit$density_failure_1,
+  density_censor = sl_fit$density_censor_1,
+  g1W = sl_fit$g1W,
+  A_intervene = 1
+)$fit(k_grid = k_grid)
+ipcw_fit_0_all <- repeat_t_grid$new(
+  method = ipcw,
+  A = df$A,
+  T_tilde = df$T.tilde,
+  Delta = df$Delta,
+  density_failure = sl_fit$density_failure_0,
+  density_censor = sl_fit$density_censor_0,
+  g1W = sl_fit$g1W,
+  A_intervene = 0
+)$fit(k_grid = k_grid)
+ipcw_fit_1 <- survival_curve$new(t = k_grid, survival = ipcw_fit_1_all)
+ipcw_fit_0 <- survival_curve$new(t = k_grid, survival = ipcw_fit_0_all)
+
+
+plot(sl_density_failure_1_marginal$survival %>% t(), lty = 2,type = 'l',col = 'red')
+lines(sl_density_failure_0_marginal$survival %>% t(), lty = 2,type = 'l',col = 'blue')
+lines(moss_fit_1$survival %>% t(), lty = 1,type = 'l',col = 'red')
+lines(moss_fit_0$survival %>% t(), lty = 1,type = 'l',col = 'blue')
+lines(ipcw_fit_1$survival %>% t(), lty = 4,type = 'l',col = 'red')
+lines(ipcw_fit_0$survival %>% t(), lty = 4,type = 'l',col = 'blue')
 
 
 
-plot(sl_density_failure_0_marginal$survival %>% t(), lty = 1,type = 'l',col = 'blue')
-lines(sl_density_failure_1_marginal$survival %>% t(), lty = 1,type = 'l',col = 'red')
+moss_hazard_ate_fit <- MOSS_hazard_ate$new(
+  A = df$A,
+  T_tilde = df$T.tilde,
+  Delta = df$Delta,
+  density_failure = sl_fit$density_failure_1,
+  density_censor = sl_fit$density_censor_1,
+  density_failure_0 = sl_fit$density_failure_0,
+  density_censor_0 = sl_fit$density_censor_0,
+  g1W = sl_fit$g1W,
+  k_grid = k_grid
+)
+psi_moss_hazard_ate_1 <- moss_hazard_ate_fit$iterate_onestep(epsilon = 1e-3, max_num_interation = 10, verbose = T)
+moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_hazard_ate_1)
+moss_hazard_ate_fit_1$survival
+moss_fit_1$survival-moss_fit_0$survival
+
+
+plot(psi_moss_hazard_ate_1, lty = 1,type = 'l')
+lines((moss_fit_1$survival-moss_fit_0$survival) %>% t(),type = 'l',lty = 2)
+lines((sl_density_failure_1_marginal$survival-sl_density_failure_0_marginal$survival) %>% t(), lty = 2,type = 'l',col = 'blue')
 
 
 
 
 
 
-compose_result <- function(scenario, scenario_tmle, scenario_EIC,scenario_var = data_out){
-  if (exists('scenario')){
-    Estimation <- plyr::ldply(scenario, function(x) x)
-    SD <- plyr::ldply(scenario, function(x) x) %>% sapply(sd) %>% as.vector()
-    Estimation_average <-  plyr::ldply(scenario, function(x) colMeans(x))
-  }else{
-    message('No scenario found')
-  }
-  if (exists('scenario_tmle')){
-    TMLE_estimation <- plyr::ldply(scenario_tmle, function(x) x)
-    SD_t <- plyr::ldply(scenario_tmle, function(x) x) %>% sapply(sd) %>% as.vector()
-    Estimation_average_t <- plyr::ldply(scenario_tmle, function(x) colMeans(x))
-  }else{
-    message('No TMLE scenario found, set as initial fitting')
-    scenario_tmle <- scenario
-    TMLE_estimation <- plyr::ldply(scenario_tmle, function(x) x)
-    SD_t <- plyr::ldply(scenario_tmle, function(x) x) %>% sapply(sd) %>% as.vector()
-    Estimation_average_t <- plyr::ldply(scenario_tmle, function(x) colMeans(x))
-  }
-  if (exists('scenario_EIC')){
-    EIC_estimation <- plyr::ldply(scenario_EIC, function(x) x)
-  }else{
-    message('No EIC found')
-  }
+
+
+
+
+get_result_2 <- function(scenario, scenario_tmle, scenario_EIC,scenario_var = data_out){
+  TMLE_estimation <- plyr::ldply(scenario_tmle, function(x) x)
+  EIC_estimation <- plyr::ldply(scenario_EIC, function(x) x)
+  Estimation <- plyr::ldply(scenario, function(x) x)
+  SD <- plyr::ldply(scenario, function(x) x) %>% sapply(sd) %>% as.vector()
+  SD_t <- plyr::ldply(scenario_tmle, function(x) x) %>% sapply(sd) %>% as.vector()
   
+  Estimation_average <-  plyr::ldply(scenario, function(x) colMeans(x))
+  Estimation_average_t <- plyr::ldply(scenario_tmle, function(x) colMeans(x))
   
   return(list(
     TMLE_estimation= TMLE_estimation,
@@ -146,9 +234,9 @@ lines(scenario_p$Summary$SD_t,type='l')
 IdentifyHTE <- function(scenario_p,raw_scenario,SL.library = c("SL.glm.interaction","SL.glmnet","SL.gam")){
   var <- scenario_p$scenario_var
   W_names <- grep('W',names(var),value = T)
-
+  
   fitdat <- data.frame(Y=raw_scenario$X50,var)
-
+  
   g.SL.1  <- SuperLearner(Y=fitdat$Y, X=fitdat[,W_names], SL.library=SL.library, family="gaussian")
   eval(parse(text=paste0("sample1 <- data.frame(",W_names[1],"=c(1:10000))")))
   eval(parse(text=paste0("sd1 <- data.frame(",W_names[1],"=c(1))")))
@@ -164,9 +252,9 @@ IdentifyHTE <- function(scenario_p,raw_scenario,SL.library = c("SL.glm.interacti
   }
   orderSD <- data.frame(SD=t(sd1),Covariate = names(sd1))
   orderSD <- orderSD[order(orderSD$SD),]
-
+  
   plot(orderSD$SD,type="l",ylab = "SD")
-
+  
   secondDerivative <- orderSD$SD
   for(i in 2:(nW-1)){
     secondDerivative[i] = 0
@@ -179,7 +267,7 @@ IdentifyHTE <- function(scenario_p,raw_scenario,SL.library = c("SL.glm.interacti
   orderSD$HTE <- ifelse(orderSD$SD>elbow,"Yes","No")
   HTE.data <-  gather(sample1)
   HTE.data$HTE <- orderSD[match(HTE.data$key,orderSD$Covariate),'HTE']
-
+  
   return(list(HTE.data = HTE.data,
               orderSD = orderSD,
               elbow = elbow
@@ -262,7 +350,7 @@ kernal_process <- function(scenario,scenario_tmle,scenario_EIC,step,wname='W_mi_
   effect_by_sample <- list()
   scenario_p_v2 <- get_result_2(scenario,scenario_tmle,scenario_EIC,data_out)
   effect_by_sample[[i]] <- compute_effect(scenario_p = scenario_p_v2,step=step,wname,endtime)
-
+  
   effect_by_sample_p <- plyr::ldply(effect_by_sample, function(x) x)
   effect_grouped_psi <- aggregate(effect_by_sample_p[,c("psi.i","sd_EIC","upper_CI","lower_CI")],
                                   by=list(time = effect_by_sample_p$x,group=effect_by_sample_p$group), mean)
@@ -277,9 +365,9 @@ kernal_process <- function(scenario,scenario_tmle,scenario_EIC,step,wname='W_mi_
 names(data_out)
 
 kernal_p <- kernal_process(scenario = list(Estimation),
-                             scenario_tmle = list(TMLE_estimation),
-                             scenario_EIC = list(EIC),step = 10,
-                             wname = 'W_age')
+                           scenario_tmle = list(TMLE_estimation),
+                           scenario_EIC = list(EIC),step = 10,
+                           wname = 'W_age')
 
 kernal_p <- data.frame(group = "Test",kernal_p)
 

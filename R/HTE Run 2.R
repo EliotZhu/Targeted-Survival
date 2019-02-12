@@ -1,15 +1,14 @@
-n_sim = 1000
-simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario s",ratDiv=1,confoundlevel = 1,confoundlevel_cen=1)
-#simulated <- simulate_data(n_sim = n_sim)
+library(dplyr,abind)
+library(tidyverse)
+library(survival,simsurv)
+library(survminer)
+library(simcausal)
+
+n_sim = 2000
+simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=100,confoundlevel = 1,confoundlevel_cen=1)
 df <- simulated$dat
-df <- df[df$T.tilde<=50 & df$T.tilde>=0,]
 df <- df[complete.cases(df),]
 adjustVars <- simulated$wnames
-eventrate <- table(df$Delta[df$T.tilde<100])/nrow(df)
-eventrate
-
-
-
 
 sl_lib_g <- c("SL.mean", "SL.glm", "SL.gam")
 sl_lib_censor <- c("SL.mean", "SL.glm", "SL.gam", "SL.earth")
@@ -20,7 +19,7 @@ k_grid <- 1:max(df$T.tilde)
 k_grid
 
 library(MOSS)
-message("SL")
+#SL
 sl_fit <- initial_sl_fit(
   ftime = df$T.tilde,
   ftype = df$Delta,
@@ -38,15 +37,12 @@ sl_fit$density_failure_0$hazard_to_survival()
 sl_fit$density_failure_1$t <- k_grid
 sl_fit$density_failure_0$t <- k_grid
 
-
-
 sl_density_failure_1_marginal <- sl_fit$density_failure_1$clone(deep = TRUE)
 sl_density_failure_0_marginal <- sl_fit$density_failure_0$clone(deep = TRUE)
 sl_density_failure_1_marginal$survival <- matrix(colMeans(sl_density_failure_1_marginal$survival), nrow = 1)
 sl_density_failure_0_marginal$survival <- matrix(colMeans(sl_density_failure_0_marginal$survival), nrow = 1)
-message("moss")
 
-
+#MOSS fitting
 moss_fit <- MOSS$new(
   A = df$A,
   T_tilde = df$T.tilde,
@@ -58,7 +54,7 @@ moss_fit <- MOSS$new(
   k_grid = k_grid
 )
 psi_moss_1 <- moss_fit$onestep_curve(
-  epsilon = 1 / n_sim,
+  epsilon = 10 / n_sim,
   #epsilon = 1e-2,
   max_num_interation = 5e1,
   verbose = T
@@ -76,36 +72,24 @@ moss_fit <- MOSS$new(
   k_grid = k_grid
 )
 psi_moss_0 <- moss_fit$onestep_curve(
-  epsilon = 1 / n_sim,
+  epsilon = 10 / n_sim,
   # epsilon = 1e-5,
   max_num_interation = 5e1,
   verbose = T
 )
 moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
 
-#survival_truth_1 <- survival_curve$new(t = k_grid, survival = simulated$true_surv1(k_grid - 1))
-#survival_truth_0 <- survival_curve$new(t = k_grid, survival = simulated$true_surv0(k_grid - 1))
 controls <- simulated$dat2[,grep("W",names( simulated$dat2),value = T)]
-true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,length(k_grid)-1,A=1)))
-true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,length(k_grid)-1,A=0)))
+true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,(length(k_grid)-1)*10,A=1)))
+true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,(length(k_grid)-1)*10,A=0)))
 
 
-
-plot(sl_density_failure_1_marginal$survival %>% t(), lty = 2,type = 'l',col = 'red',xlim = c(0,50))
-lines(sl_density_failure_0_marginal$survival %>% t(), lty = 2,type = 'l',col = 'blue')
-lines(moss_fit_1$survival %>% t(), lty = 1,type = 'l',col = 'red')
-lines(moss_fit_0$survival %>% t(), lty = 1,type = 'l',col = 'blue')
-#lines(survival_truth_1$survival%>% t(), lty = 2,type = 'l')
-#lines(survival_truth_0$survival%>% t(), lty = 2,type = 'l')
-
-lines(colMeans(true.1), lty = 2,type = 'l')
-lines(colMeans(true.0), lty = 3,type = 'l')
-
-data.frame(TMLE= round(moss_fit_1$survival %>% t()-colMeans(true.1),4)*100,
-           Sl = round(sl_density_failure_1_marginal$survival %>% t()-colMeans(true.1),4)*100) 
-
-data.frame(TMLE= round(moss_fit_0$survival %>% t()-colMeans(true.0),4)*100,
-           Sl = round(sl_density_failure_0_marginal$survival %>% t()-colMeans(true.0),4)*100) 
+#%Bias for treatment curve 
+data.frame(TMLE= round((moss_fit_1$survival %>% t()-colMeans(true.1))/colMeans(true.1),4)*100,
+           Sl = round((sl_density_failure_1_marginal$survival %>% t()-colMeans(true.1))/colMeans(true.1),4)*100) 
+#%Bias for control curve 
+data.frame(TMLE= round((moss_fit_0$survival %>% t()-colMeans(true.0))/colMeans(true.0),4)*100,
+           Sl = round((sl_density_failure_0_marginal$survival %>% t()-colMeans(true.0))/colMeans(true.0),4)*100) 
 
 
 moss_hazard_ate_fit <- MOSS_hazard_ate$new(
@@ -129,9 +113,8 @@ moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_haza
 TMLE_diff = psi_moss_hazard_ate_1
 SL_diff = (sl_density_failure_1_marginal$survival-sl_density_failure_0_marginal$survival) %>% t()
 true_diff = (colMeans(true.1)-colMeans(true.0))
-
-data.frame(TMLE= round(TMLE_diff-true_diff,4)/true_diff*100,
-           Sl = round(SL_diff-true_diff,4)/true_diff*100)
+#%Bias for difference curve
+data.frame(TMLE= round(TMLE_diff-true_diff,4)/true_diff*100,Sl = round(SL_diff-true_diff,4)/true_diff*100)
 
 
 
