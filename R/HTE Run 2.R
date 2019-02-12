@@ -1,13 +1,14 @@
-n_sim = 2000
-rate = 1
-simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=rate)
+n_sim = 1000
+simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=1000,confoundlevel = 1,confoundlevel_cen=1)
 #simulated <- simulate_data(n_sim = n_sim)
 df <- simulated$dat
-df <- df[df$T.tilde<=50 & df$T.tilde>0,]
+df <- df[df$T.tilde<=50 & df$T.tilde>=0,]
 df <- df[complete.cases(df),]
 adjustVars <- simulated$wnames
-eventrate <- table(df$Delta[df$T.tilde<12])/nrow(df)
+eventrate <- table(df$Delta[df$T.tilde<100])/nrow(df)
 eventrate
+
+
 
 
 sl_lib_g <- c("SL.mean", "SL.glm", "SL.gam")
@@ -16,6 +17,7 @@ sl_lib_failure <- c("SL.mean", "SL.glm", "SL.gam", "SL.earth")
 
 df$T.tilde <- df$T.tilde + 1
 k_grid <- 1:max(df$T.tilde)
+k_grid
 
 library(MOSS)
 message("SL")
@@ -83,50 +85,27 @@ moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
 
 #survival_truth_1 <- survival_curve$new(t = k_grid, survival = simulated$true_surv1(k_grid - 1))
 #survival_truth_0 <- survival_curve$new(t = k_grid, survival = simulated$true_surv0(k_grid - 1))
-controls <- df[,grep("W",names(df),value = T)]
-true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,100,ratDiv=rate,A=1)))
-true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,100,ratDiv=rate,A=0)))
+controls <- simulated$dat2[,grep("W",names( simulated$dat2),value = T)]
+true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,420,A=1)))
+true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,420,A=0)))
 
 
-# ipcw
-message("ipcw + ee")
-ipcw_fit_1_all <- repeat_t_grid$new(
-  method = ipcw,
-  A = df$A,
-  T_tilde = df$T.tilde,
-  Delta = df$Delta,
-  density_failure = sl_fit$density_failure_1,
-  density_censor = sl_fit$density_censor_1,
-  g1W = sl_fit$g1W,
-  A_intervene = 1
-)$fit(k_grid = k_grid)
-ipcw_fit_0_all <- repeat_t_grid$new(
-  method = ipcw,
-  A = df$A,
-  T_tilde = df$T.tilde,
-  Delta = df$Delta,
-  density_failure = sl_fit$density_failure_0,
-  density_censor = sl_fit$density_censor_0,
-  g1W = sl_fit$g1W,
-  A_intervene = 0
-)$fit(k_grid = k_grid)
-ipcw_fit_1 <- survival_curve$new(t = k_grid, survival = ipcw_fit_1_all)
-ipcw_fit_0 <- survival_curve$new(t = k_grid, survival = ipcw_fit_0_all)
 
-
-plot(sl_density_failure_1_marginal$survival %>% t(), lty = 2,type = 'l',col = 'red')
+plot(sl_density_failure_1_marginal$survival %>% t(), lty = 2,type = 'l',col = 'red',xlim = c(0,50))
 lines(sl_density_failure_0_marginal$survival %>% t(), lty = 2,type = 'l',col = 'blue')
 lines(moss_fit_1$survival %>% t(), lty = 1,type = 'l',col = 'red')
 lines(moss_fit_0$survival %>% t(), lty = 1,type = 'l',col = 'blue')
-#lines(ipcw_fit_1$survival %>% t(), lty = 4,type = 'l',col = 'green')
-#lines(ipcw_fit_0$survival %>% t(), lty = 4,type = 'l',col = 'green')
 #lines(survival_truth_1$survival%>% t(), lty = 2,type = 'l')
 #lines(survival_truth_0$survival%>% t(), lty = 2,type = 'l')
 
 lines(colMeans(true.1), lty = 2,type = 'l')
 lines(colMeans(true.0), lty = 3,type = 'l')
 
+data.frame(TMLE= round(moss_fit_1$survival %>% t()-colMeans(true.1),4)*100,
+           Sl = round(sl_density_failure_1_marginal$survival %>% t()-colMeans(true.1),4)*100) 
 
+data.frame(TMLE= round(moss_fit_0$survival %>% t()-colMeans(true.0),4)*100,
+           Sl = round(sl_density_failure_0_marginal$survival %>% t()-colMeans(true.0),4)*100) 
 
 
 moss_hazard_ate_fit <- MOSS_hazard_ate$new(
@@ -146,10 +125,9 @@ moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_haza
 
 
 
-lines(colMeans(true.1)-colMeans(true.0), lty = 1,type = 'l')
 plot(psi_moss_hazard_ate_1,type = 'l',lty = 1,,col = 'blue')
-lines((moss_fit_1$survival-moss_fit_0$survival) %>% t(),type = 'l',lty = 1)
 lines((sl_density_failure_1_marginal$survival-sl_density_failure_0_marginal$survival) %>% t(), lty = 2,type = 'l')
+lines(colMeans(true.1)-colMeans(true.0), lty = 1,type = 'l')
 
 
 
