@@ -64,8 +64,8 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
 
   D <- D+
     node("Trexp", distr = "rexp", rate = rate) +
-    node("T", distr = "rconst", const = round(Trexp/10)) +
-    node("C", distr = "rconst", const = round(Cweib/10)) +
+    node("T", distr = "rconst", const = round(Trexp)) +
+    node("C", distr = "rconst", const = round(Cweib)) +
     node("T.tilde", distr = "rconst", const = ifelse(T <= C , T, C)) +
     node("Delta", distr = "rconst", const = ifelse(T <= C , 1, 0))
   setD <- set.DAG(D)

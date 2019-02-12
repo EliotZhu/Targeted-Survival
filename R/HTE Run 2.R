@@ -1,5 +1,5 @@
 n_sim = 1000
-simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=1000,confoundlevel = 1,confoundlevel_cen=1)
+simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario s",ratDiv=1,confoundlevel = 1,confoundlevel_cen=1)
 #simulated <- simulate_data(n_sim = n_sim)
 df <- simulated$dat
 df <- df[df$T.tilde<=50 & df$T.tilde>=0,]
@@ -86,8 +86,8 @@ moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
 #survival_truth_1 <- survival_curve$new(t = k_grid, survival = simulated$true_surv1(k_grid - 1))
 #survival_truth_0 <- survival_curve$new(t = k_grid, survival = simulated$true_surv0(k_grid - 1))
 controls <- simulated$dat2[,grep("W",names( simulated$dat2),value = T)]
-true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,420,A=1)))
-true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,420,A=0)))
+true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,length(k_grid)-1,A=1)))
+true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,length(k_grid)-1,A=0)))
 
 
 
@@ -125,9 +125,13 @@ moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_haza
 
 
 
-plot(psi_moss_hazard_ate_1,type = 'l',lty = 1,,col = 'blue')
-lines((sl_density_failure_1_marginal$survival-sl_density_failure_0_marginal$survival) %>% t(), lty = 2,type = 'l')
-lines(colMeans(true.1)-colMeans(true.0), lty = 1,type = 'l')
+
+TMLE_diff = psi_moss_hazard_ate_1
+SL_diff = (sl_density_failure_1_marginal$survival-sl_density_failure_0_marginal$survival) %>% t()
+true_diff = (colMeans(true.1)-colMeans(true.0))
+
+data.frame(TMLE= round(TMLE_diff-true_diff,4)/true_diff*100,
+           Sl = round(SL_diff-true_diff,4)/true_diff*100)
 
 
 
