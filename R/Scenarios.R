@@ -23,7 +23,10 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
     D <- D+ node("odds",distr = "rconst", const = 1+confoundlevel*(W1+W2))+
         node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
         node("rate",distr = "rconst", const = (1+(W1+W2+W3+W4)*A+W1+W2+W3+W4)/ratDiv)+
-        node("Cweib", distr = "rweibull", shape = 1+confoundlevel_cen*(W3+W4), scale = 75)
+        node("Cweib", distr = "rweibull", shape = 1+confoundlevel_cen*(W3+W4), scale = 75)+
+        node("Trexp", distr = "rexp", rate = rate) +
+        node("T", distr = "rconst", const = round(Trexp/10)) +
+        node("C", distr = "rconst", const = round(Cweib/10)) 
     wnames <- c('W1','W2','W3','W4','W5','W6','W7','W8','W9','W10')
     true.func <- function(x,tgrid,A){
       x <- as.matrix(x,nrow=1)
@@ -34,7 +37,10 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
   }else if(conmode == "scenario s"){
     D <- D+node("A", distr = "rbinom", size = 1, prob = .15 + .5 * as.numeric(W2 > .75)) +
       node("rate",distr = "rconst", const = 1 + .7 * W2^2 - .8 * A)+
-      node("Cweib", distr = "rweibull", shape = 1 + .5 * W2, scale = 75) 
+      node("Cweib", distr = "rweibull", shape = 1 + .5 * W2, scale = 75)+
+      node("Trexp", distr = "rexp", rate = rate) +
+      node("T", distr = "rconst", const = round(Trexp/10)) +
+      node("C", distr = "rconst", const = round(Cweib/10)) 
     wnames <- c('W1','W2')
     true.func <- function(x,tgrid,A){
       x <- as.matrix(x,nrow=1)
@@ -62,12 +68,8 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
 
   }
 
-  D <- D+
-    node("Trexp", distr = "rexp", rate = rate) +
-    node("T", distr = "rconst", const = round(Trexp)) +
-    node("C", distr = "rconst", const = round(Cweib)) +
-    node("T.tilde", distr = "rconst", const = ifelse(T <= C , T, C)) +
-    node("Delta", distr = "rconst", const = ifelse(T <= C , 1, 0))
+  D <- D+node("T.tilde", distr = "rconst", const = ifelse(T <= C , T, C)) +
+         node("Delta", distr = "rconst", const = ifelse(T <= C , 1, 0))
   setD <- set.DAG(D)
 
   dat <- sim(setD,n=samplesize,rndseed= iti)
