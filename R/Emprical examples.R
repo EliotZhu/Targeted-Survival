@@ -75,15 +75,14 @@ ITE <- sl_fit$density_failure_1$survival-sl_fit$density_failure_0$survival
 
 
 eic_fit <- eic$new(
-  A = self$A,
-  T_tilde = self$T_tilde,
-  Delta = self$Delta,
-  density_failure = self$density_failure,
-  density_censor = self$density_censor,
-  g1W = self$g1W,
-  psi = psi_n,
-  A_intervene = self$A_intervene
-)$all_t(k_grid = k_grid)
+  A = df$A,
+  T_tilde = df$T.tilde,
+  Delta = df$Delta,
+  density_failure = sl_fit$density_failure_1,
+  density_censor = sl_fit$density_censor_1,
+  g1W = sl_fit$g1W,
+  psi = colMeans(sl_fit$density_failure_1$survival),
+  A_intervene = 1)$all_t(k_grid = k_grid)
 mean_eic <- colMeans(eic_fit)
 
 
