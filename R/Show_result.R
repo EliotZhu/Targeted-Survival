@@ -18,6 +18,7 @@ for (i in 1:50){
   scenario_3_r001 <- suppressMessages(append(scenario_3_r001, list(read_csv(paste0("result/coverage/raw_CH_3_scenario_3_r001_",i,".csv"))) ))
   scenario_3_noc <- suppressMessages(append(scenario_3_noc, list(read_csv(paste0("result/coverage/raw_CH_3_scenario_3_noc_",i,".csv"))) ))
 }
+
 scenario_3_t <- scenario_3_nohte_t <- scenario_3_r10_t <- scenario_3_r01_t <-scenario_3_r001_t <-  scenario_3_noc_t <- list()
 for (i in 1:50){
   scenario_3_t <- suppressMessages(append(scenario_3_t, list(read_csv(paste0("result/coverage/testdat_CH_3_scenario_3_r30_",i,".csv"))) ))

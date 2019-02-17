@@ -33,20 +33,6 @@ data_out$T.tilde <- round(data_out$T.tilde/180)
 data_out <- data_out[data_out$T.tilde<=200 & data_out$T.tilde>0,]
 
 
-names(data_out) <- paste("W",names(data_out),sep = "_")
-adjustVars <- names(data_out)
-Elliott$combodate <- as.Date(Elliott$combodate, "%Y-%m-%d")
-Elliott$af_start <- as.Date(Elliott$af_start, "%Y-%m-%d")
-Elliott$af_end <- as.Date(Elliott$af_end, "%Y-%m-%d")
-follow_up <- Elliott$af_end-Elliott$af_start
-event_time <- Elliott$combodate-Elliott$af_start
-data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
-data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
-data_out$A <- Elliott$anticoagulant
-data_out$T.tilde <- round(data_out$T.tilde/180)
-data_out <- data_out[data_out$T.tilde<=200 & data_out$T.tilde>0,]
-
-
 
 table(data_out$T.tilde)
 hist(data_out$T.tilde)
@@ -58,15 +44,12 @@ table(data_out$A)/nrow(data_out)
 #data_out <- data_out[idx,]
 data_out <- data_out[complete.cases(data_out),]
 df <- data_out
-sl_lib_g <- c("SL.mean", "SL.glm")
-sl_lib_censor <- c("SL.mean", "SL.glm")
-sl_lib_failure <- c("SL.mean", "SL.glm")
-eventrate <- table(df$Delta[df$T.tilde<12])/nrow(df)
+sl_lib_g <- c("SL.mean", "SL.glm","SL.earth")
+sl_lib_censor <- c("SL.mean", "SL.glm","SL.earth")
+sl_lib_failure <- c("SL.mean", "SL.glm","SL.earth")
 df$T.tilde <- df$T.tilde + 1
 k_grid <- 1:max(df$T.tilde)
 n_sim <- nrow(df)
-
-
 
 
 library(MOSS)
@@ -93,135 +76,78 @@ sl_density_failure_1_marginal <- sl_fit$density_failure_1$clone(deep = TRUE)
 sl_density_failure_0_marginal <- sl_fit$density_failure_0$clone(deep = TRUE)
 sl_density_failure_1_marginal$survival <- matrix(colMeans(sl_density_failure_1_marginal$survival), nrow = 1)
 sl_density_failure_0_marginal$survival <- matrix(colMeans(sl_density_failure_0_marginal$survival), nrow = 1)
-message("moss")
-
-plot(sl_fit$density_failure_1$hazard/sl_fit$density_failure_0$hazard)[,14]
+ITE <- sl_fit$density_failure_1$survival-sl_fit$density_failure_0$survival
 
 
-moss_fit <- MOSS$new(
+eic_fit_1 <- eic$new(
   A = df$A,
   T_tilde = df$T.tilde,
   Delta = df$Delta,
   density_failure = sl_fit$density_failure_1,
   density_censor = sl_fit$density_censor_1,
   g1W = sl_fit$g1W,
-  A_intervene = 1,
-  k_grid = k_grid
-)
-psi_moss_1 <- moss_fit$onestep_curve(
-  epsilon = 1e-1 / n_sim,
-  #epsilon = 1e-2,
-  max_num_interation = 1e1,
-  verbose = T
-)
-moss_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_1)
+  psi = colMeans(sl_fit$density_failure_1$survival),
+  A_intervene = 1)$all_t(k_grid = k_grid)
+mean_eic_1 <- colMeans(eic_fit_1)
 
-moss_fit <- MOSS$new(
+eic_fit_0 <- eic$new(
   A = df$A,
   T_tilde = df$T.tilde,
   Delta = df$Delta,
   density_failure = sl_fit$density_failure_0,
   density_censor = sl_fit$density_censor_0,
   g1W = sl_fit$g1W,
-  A_intervene = 0,
-  k_grid = k_grid
-)
-psi_moss_0 <- moss_fit$onestep_curve(
-  epsilon = 1e-1 / n_sim,
-  # epsilon = 1e-5,
-  max_num_interation = 1e1,
-  verbose = T
-)
-moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
-
-
-# ipcw
-message("ipcw + ee")
-ipcw_fit_1_all <- repeat_t_grid$new(
-  method = ipcw,
-  A = df$A,
-  T_tilde = df$T.tilde,
-  Delta = df$Delta,
-  density_failure = sl_fit$density_failure_1,
-  density_censor = sl_fit$density_censor_1,
-  g1W = sl_fit$g1W,
-  A_intervene = 1
-)$fit(k_grid = k_grid)
-ipcw_fit_0_all <- repeat_t_grid$new(
-  method = ipcw,
-  A = df$A,
-  T_tilde = df$T.tilde,
-  Delta = df$Delta,
-  density_failure = sl_fit$density_failure_0,
-  density_censor = sl_fit$density_censor_0,
-  g1W = sl_fit$g1W,
-  A_intervene = 0
-)$fit(k_grid = k_grid)
-ipcw_fit_1 <- survival_curve$new(t = k_grid, survival = ipcw_fit_1_all)
-ipcw_fit_0 <- survival_curve$new(t = k_grid, survival = ipcw_fit_0_all)
-
-
-plot(sl_density_failure_1_marginal$survival %>% t(), lty = 2,type = 'l',col = 'red')
-lines(sl_density_failure_0_marginal$survival %>% t(), lty = 2,type = 'l',col = 'blue')
-lines(moss_fit_1$survival %>% t(), lty = 1,type = 'l',col = 'red')
-lines(moss_fit_0$survival %>% t(), lty = 1,type = 'l',col = 'blue')
-lines(ipcw_fit_1$survival %>% t(), lty = 4,type = 'l',col = 'red')
-lines(ipcw_fit_0$survival %>% t(), lty = 4,type = 'l',col = 'blue')
+  psi = colMeans(sl_fit$density_failure_0$survival),
+  A_intervene = 1)$all_t(k_grid = k_grid)
+mean_eic_0 <- colMeans(eic_fit_0)
 
 
 
-moss_hazard_ate_fit <- MOSS_hazard_ate$new(
-  A = df$A,
-  T_tilde = df$T.tilde,
-  Delta = df$Delta,
-  density_failure = sl_fit$density_failure_1,
-  density_censor = sl_fit$density_censor_1,
-  density_failure_0 = sl_fit$density_failure_0,
-  density_censor_0 = sl_fit$density_censor_0,
-  g1W = sl_fit$g1W,
-  k_grid = k_grid
-)
-psi_moss_hazard_ate_1 <- moss_hazard_ate_fit$iterate_onestep(epsilon = 1e-3, max_num_interation = 10, verbose = T)
-moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_hazard_ate_1)
-moss_hazard_ate_fit_1$survival
-moss_fit_1$survival-moss_fit_0$survival
+plot(sl_density_failure_0_marginal$survival %>% t(), lty = 1,type = 'l',col = 'blue')
+lines(sl_density_failure_1_marginal$survival %>% t(), lty = 1,type = 'l',col = 'red')
 
 
-plot(psi_moss_hazard_ate_1, lty = 1,type = 'l')
-lines((moss_fit_1$survival-moss_fit_0$survival) %>% t(),type = 'l',lty = 2)
-lines((sl_density_failure_1_marginal$survival-sl_density_failure_0_marginal$survival) %>% t(), lty = 2,type = 'l',col = 'blue')
-
-
-
-
-
-
-
-
-
-
-get_result_2 <- function(scenario, scenario_tmle, scenario_EIC,scenario_var = data_out){
-  TMLE_estimation <- plyr::ldply(scenario_tmle, function(x) x)
-  EIC_estimation <- plyr::ldply(scenario_EIC, function(x) x)
-  Estimation <- plyr::ldply(scenario, function(x) x)
-  SD <- plyr::ldply(scenario, function(x) x) %>% sapply(sd) %>% as.vector()
-  SD_t <- plyr::ldply(scenario_tmle, function(x) x) %>% sapply(sd) %>% as.vector()
+compose_result <- function(scenario, scenario_tmle, scenario_EIC,scenario_var = data_out){
+  if (exists('scenario')){
+    Estimation <- plyr::ldply(scenario, function(x) x)
+    SD <- plyr::ldply(scenario, function(x) x) %>% sapply(sd) %>% as.vector()
+    Estimation_average <-  plyr::ldply(scenario, function(x) colMeans(x))
+  }else{
+    message('No scenario found')
+  }
+  if (exists('scenario_tmle')){
+    TMLE_estimation <- plyr::ldply(scenario_tmle, function(x) x)
+    SD_t <- plyr::ldply(scenario_tmle, function(x) x) %>% sapply(sd) %>% as.vector()
+    Estimation_average_t <- plyr::ldply(scenario_tmle, function(x) colMeans(x))
+  }else{
+    message('No TMLE scenario found, set as initial fitting')
+    scenario_tmle <- scenario
+    TMLE_estimation <- plyr::ldply(scenario_tmle, function(x) x)
+    SD_t <- plyr::ldply(scenario_tmle, function(x) x) %>% sapply(sd) %>% as.vector()
+    Estimation_average_t <- plyr::ldply(scenario_tmle, function(x) colMeans(x))
+  }
+  if (exists('scenario_EIC')){
+    EIC_estimation <- plyr::ldply(scenario_EIC, function(x) x)
+  }else{
+    message('No EIC found')
+  }
   
-  Estimation_average <-  plyr::ldply(scenario, function(x) colMeans(x))
-  Estimation_average_t <- plyr::ldply(scenario_tmle, function(x) colMeans(x))
   
   return(list(
     TMLE_estimation= TMLE_estimation,
     EIC_estimation=EIC_estimation,
     Estimation=Estimation,
     scenario_var = scenario_var[,grep("W",names(scenario_var),value = T)],
-    Summary=data.frame(time=1:100,SD=SD,SD_t=SD_t,
+    Summary=data.frame(time=1:length(colMeans(Estimation_average)),SD=SD,SD_t=SD_t,
                        Mean = colMeans(Estimation_average) ,
                        TMLE = colMeans(Estimation_average_t))
   ))
 }
+Estimation <- ITE
+TMLE_estimation <- ITE
+EIC <- eic_fit_1-eic_fit_0
 
-scenario_p <- get_result_2(list(Estimation),list(TMLE_estimation),list(EIC),data_out)
+scenario_p <- compose_result(list(Estimation),list(TMLE_estimation),list(EIC),data_out)
 raw_scenario <- data.frame(group = "Initial",scenario_p$Estimation)
 tmle_scenario <- data.frame(group = "TMLE",scenario_p$TMLE_estimation)
 
@@ -231,11 +157,11 @@ lines(scenario_p$Summary$SD_t,type='l')
 
 #---------------------Indentify HTE ---------------------------
 
-IdentifyHTE <- function(scenario_p,raw_scenario,SL.library = c("SL.glm.interaction","SL.glmnet","SL.gam")){
+IdentifyHTE <- function(scenario_p,raw_scenario,SL.library = c("SL.glm.interaction","SL.glmnet","SL.gam"),point){
   var <- scenario_p$scenario_var
   W_names <- grep('W',names(var),value = T)
   
-  fitdat <- data.frame(Y=raw_scenario$X50,var)
+  fitdat <- data.frame(Y=raw_scenario[,point],var)
   
   g.SL.1  <- SuperLearner(Y=fitdat$Y, X=fitdat[,W_names], SL.library=SL.library, family="gaussian")
   eval(parse(text=paste0("sample1 <- data.frame(",W_names[1],"=c(1:10000))")))
@@ -274,7 +200,7 @@ IdentifyHTE <- function(scenario_p,raw_scenario,SL.library = c("SL.glm.interacti
   ))
 }
 
-Identified.HTE <- IdentifyHTE(scenario_p,raw_scenario)
+Identified.HTE <- IdentifyHTE(scenario_p,raw_scenario,point=8)
 
 Identified.HTE$orderSD
 
@@ -299,7 +225,6 @@ g = ggplot(data=HTE.data,aes(x=key,y=value)) + labs(x = "Covariate",y = "")+
 
 
 #Subgroup
-
 subgroupCI <- function(scenario_p ,convery.idx,ii){
   sample.ii <- scenario_p$TMLE_estimation[convery.idx==ii,]
   psi.i <-  colMeans(sample.ii)
@@ -313,9 +238,11 @@ subgroupCI <- function(scenario_p ,convery.idx,ii){
 
 compute_group <- function(scenario_p ,step,wname){
   controls <- scenario_p$scenario_var
+  
+  
   W_names <- grep('W',names(var),value = T)
   eval(parse(text=paste0("selection <- controls$",wname)))
-  n1<-seq(0,max(selection)/2,max(selection)/2/step)
+  n1<-seq(min(selection),max(selection),length.out = step)
   convery.idx <- selection
   maEnbk1 <- list();
   for (ii in 1:step){
@@ -324,9 +251,8 @@ compute_group <- function(scenario_p ,step,wname){
     convery.idx[I] <- ii
   }
   table(convery.idx)
-  convery.idx[which(convery.idx<1)] = round(convery.idx[which(convery.idx<1)])
-  convery.idx <- ifelse(convery.idx==0,2,convery.idx)
   step <- max(convery.idx)
+  #plot(data.frame(X=controls$W_age,Y= convery.idx))
   return(list(step=step,
               convery.idx=convery.idx))
 }
@@ -346,42 +272,55 @@ compute_effect <- function(scenario_p,step,wname,endtime){
   return(plyr::ldply(Psi_group, function(x) x))
 }
 
-kernal_process <- function(scenario,scenario_tmle,scenario_EIC,step,wname='W_mi_count',endtime=100){
+kernal_process <- function(scenario,scenario_tmle,scenario_EIC,step,wname='W_age',endtime=15,data_out){
   effect_by_sample <- list()
-  scenario_p_v2 <- get_result_2(scenario,scenario_tmle,scenario_EIC,data_out)
-  effect_by_sample[[i]] <- compute_effect(scenario_p = scenario_p_v2,step=step,wname,endtime)
+  scenario_p_v2 <- compose_result(scenario,scenario_tmle,scenario_EIC,data_out)
+  effect_by_sample <- compute_effect(scenario_p = scenario_p_v2,step=step,wname,endtime)
+  # effect_grouped_psi <- aggregate(effect_by_sample[,c("psi.i","sd_EIC","upper_CI","lower_CI")],
+  #                                 by=list(time = effect_by_sample$x,group=effect_by_sample$group), mean)
+  # 
+  # effect_grouped_sd <- aggregate(effect_by_sample[,c("psi.i","sd_EIC","upper_CI","lower_CI")],
+  #                                by=list(time = effect_by_sample$x,group=effect_by_sample$group), sd)
+  effect_by_sample$time <- effect_by_sample$x
   
-  effect_by_sample_p <- plyr::ldply(effect_by_sample, function(x) x)
-  effect_grouped_psi <- aggregate(effect_by_sample_p[,c("psi.i","sd_EIC","upper_CI","lower_CI")],
-                                  by=list(time = effect_by_sample_p$x,group=effect_by_sample_p$group), mean)
-  effect_grouped_sd <- aggregate(effect_by_sample_p[,c("psi.i","sd_EIC","upper_CI","lower_CI")],
-                                 by=list(time = effect_by_sample_p$x,group=effect_by_sample_p$group), sd)
+  effect_grouped_psi <- effect_by_sample
+  effect_grouped_sd <- effect_by_sample
+  
+  apply(effect_by_sample,2,sd)
   effect_grouped_psi$sd_EIC <- effect_grouped_sd$sd_EIC
   effect_grouped_psi$upper_CI <- effect_grouped_psi$psi.i+1.96*effect_grouped_sd$sd_EIC/sqrt(50)
   effect_grouped_psi$lower_CI <- effect_grouped_psi$psi.i-1.96*effect_grouped_sd$sd_EIC/sqrt(50)
   return(effect_grouped_psi)
 }
 
-names(data_out)
 
 kernal_p <- kernal_process(scenario = list(Estimation),
                            scenario_tmle = list(TMLE_estimation),
-                           scenario_EIC = list(EIC),step = 10,
-                           wname = 'W_age')
+                           scenario_EIC = list(EIC),step = 5,
+                           wname = 'W_copd_count',
+                           data_out=data_out)
 
 kernal_p <- data.frame(group = "Test",kernal_p)
 
-kernal_plot <- rbind(kernal_p)
-kernal_plot$group.1 <- kernal_plot$group.1/2
+table(data_out$W_copd_count)
 
+kernal_plot <- rbind(kernal_p)
+kernal_plot$group.1 <- kernal_plot$group.1/10
+
+plot(data.frame(X=data_out$W_age,Y=Estimation[,10]))
+plot(data.frame(X=data_out$W_gender,Y=Estimation[,10]))
+plot(data.frame(X=data_out$W_age,Y=scenario_p_v2$Estimation$`15`))
+
+
+plot(data.frame(X=controls$W_age,Y=  Estimation[,14]))
 
 
 g=ggplot(kernal_plot) +
-  geom_line(data=subset(kernal_plot,time == '12'), aes(x = group.1, y = psi.i,lty = group), size=.7)+
-  geom_ribbon(data=subset(kernal_plot,time == '12'), aes(ymin=lower_CI,ymax=upper_CI,x=group.1,group=group),
-              alpha=0.2)+
+  geom_line(data=subset(kernal_plot,time == '10'), aes(x = group.1, y = psi.i,lty = group), size=.7)+
+  #geom_ribbon(data=subset(kernal_plot,time == '10'), aes(ymin=lower_CI,ymax=upper_CI,x=group.1,group=group),
+  #            alpha=0.2)+
   scale_linetype_manual("",values=c("twodash", "solid","longdash","dotdash","dotted"))+
-  theme_hc()+xlab("X\U2082") +ylab("CATE") +
+  theme_hc()+xlab("W_copd_count") +ylab("CATE") +
   guides(lty = guide_legend(nrow = 2, byrow = TRUE))+
   theme(legend.spacing.y = unit(0, "mm"),
         panel.border = element_rect(colour = "white", fill=NA),

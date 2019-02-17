@@ -74,7 +74,7 @@ sl_density_failure_0_marginal$survival <- matrix(colMeans(sl_density_failure_0_m
 ITE <- sl_fit$density_failure_1$survival-sl_fit$density_failure_0$survival
 
 
-eic_fit <- eic$new(
+eic_fit_1 <- eic$new(
   A = df$A,
   T_tilde = df$T.tilde,
   Delta = df$Delta,
@@ -83,17 +83,23 @@ eic_fit <- eic$new(
   g1W = sl_fit$g1W,
   psi = colMeans(sl_fit$density_failure_1$survival),
   A_intervene = 1)$all_t(k_grid = k_grid)
-mean_eic <- colMeans(eic_fit)
+mean_eic_1 <- colMeans(eic_fit_1)
+
+eic_fit_0 <- eic$new(
+  A = df$A,
+  T_tilde = df$T.tilde,
+  Delta = df$Delta,
+  density_failure = sl_fit$density_failure_0,
+  density_censor = sl_fit$density_censor_0,
+  g1W = sl_fit$g1W,
+  psi = colMeans(sl_fit$density_failure_0$survival),
+  A_intervene = 1)$all_t(k_grid = k_grid)
+mean_eic_0 <- colMeans(eic_fit_0)
 
 
 
 plot(sl_density_failure_0_marginal$survival %>% t(), lty = 1,type = 'l',col = 'blue')
 lines(sl_density_failure_1_marginal$survival %>% t(), lty = 1,type = 'l',col = 'red')
-
-
-
-
-
 
 compose_result <- function(scenario, scenario_tmle, scenario_EIC,scenario_var = data_out){
   if (exists('scenario')){
@@ -119,6 +125,7 @@ compose_result <- function(scenario, scenario_tmle, scenario_EIC,scenario_var = 
   }else{
     message('No EIC found')
   }
+
   
   
   return(list(
@@ -126,13 +133,16 @@ compose_result <- function(scenario, scenario_tmle, scenario_EIC,scenario_var = 
     EIC_estimation=EIC_estimation,
     Estimation=Estimation,
     scenario_var = scenario_var[,grep("W",names(scenario_var),value = T)],
-    Summary=data.frame(time=1:100,SD=SD,SD_t=SD_t,
+    Summary=data.frame(time=1:length(colMeans(Estimation_average)),SD=SD,SD_t=SD_t,
                        Mean = colMeans(Estimation_average) ,
                        TMLE = colMeans(Estimation_average_t))
   ))
 }
+Estimation <- ITE
+TMLE_estimation <- ITE
+EIC <- eic_fit_1-eic_fit_0
 
-scenario_p <- get_result_2(list(Estimation),list(TMLE_estimation),list(EIC),data_out)
+scenario_p <- compose_result(list(Estimation),list(TMLE_estimation),list(EIC),data_out)
 raw_scenario <- data.frame(group = "Initial",scenario_p$Estimation)
 tmle_scenario <- data.frame(group = "TMLE",scenario_p$TMLE_estimation)
 
@@ -140,13 +150,62 @@ tmle_scenario <- data.frame(group = "TMLE",scenario_p$TMLE_estimation)
 plot(scenario_p$Summary$SD,type='l',lty=4)
 lines(scenario_p$Summary$SD_t,type='l')
 
+
+
+
+#---------------------Plot Large Violin---------------------
+violin.data <-raw_scenario
+names(violin.data) <- gsub("X","Time:",names(violin.data))
+violin.data <- reshape2::melt(violin.data, id.vars=c("group"), value.name = "value")
+violin.data$type <- "SL"
+
+violin.tmle <- tmle_scenario
+names(violin.tmle) <- gsub("X","Time:",names(violin.tmle))
+violin.tmle <- reshape2::melt(violin.tmle, id.vars=c("group"), value.name = "value")
+violin.tmle$type <- "MOSS"
+names(violin.tmle) <- names(violin.data)
+
+violin.data <- rbind(violin.tmle,violin.data)
+violin.data.1 <- violin.data #%>% group_by(variable) %>% sample_n(1000)
+violin.data.1 <- violin.data.1[violin.data.1$variable=="Time:12"|violin.data.1$variable=="Time:2"|violin.data.1$variable=="Time:6",]
+table(violin.data.1$type)
+
+
+
+vl.avg <- aggregate(violin.data$value, by=list(group = violin.data$group,variable=violin.data$variable,type = violin.data$type), mean)
+vl.avg$value <- vl.avg$x
+vl.avg <- vl.avg[vl.avg$variable=="Time:12"|vl.avg$variable=="Time:2"|vl.avg$variable=="Time:6",]
+
+g = ggplot(data=violin.data.1,aes(x=group,y=value)) + labs(x = "",y = "Treatment Effect")+theme_hc()+
+  geom_violin(data=subset(violin.data.1,type == 'MOSS'),aes(fill = "#F9BA32"),  alpha = 0.4,color=NA,lwd=.1,scale="width")+
+  geom_violin(data=subset(violin.data.1,type == 'SL'),aes(fill = "#426E86"), alpha = 0.4, color=NA,lwd=.1,scale="width")+
+  geom_point(data = subset(vl.avg,type == 'MOSS'),  alpha = .8, size = 2,color="#F9BA32",shape=3,stroke = 1)+
+  geom_point(data = subset(vl.avg,type == 'SL'), alpha = .8, size = 2, color="#426E86",shape=3,stroke = 1)+
+  scale_fill_manual("",values= c(alpha(c("#426E86","#F9BA32"),.4)),labels = c("ITE(SL)","ITE(TMLE)"))+
+  facet_wrap(~variable,ncol=1,strip.position = "bottom")+coord_flip()+
+  theme(legend.spacing.y = unit(0, "mm"),
+        panel.border = element_rect(colour = "white", fill=NA),
+        aspect.ratio = .3, axis.text = element_text(colour = 1, size = 10),
+        strip.background = element_blank(),
+        legend.background = element_blank(),
+        legend.box.background = element_rect(colour = NA,fill = "#FFFFFF"))
+ggsave("CH3_large_violin.png", plot = g, device = 'png', path = paste0(getwd(),'/GFX'),
+       scale = 1, width = 130, height = 150, units = c("mm"), dpi = 300)
+
+
+
+
+
+
+
+
 #---------------------Indentify HTE ---------------------------
 
-IdentifyHTE <- function(scenario_p,raw_scenario,SL.library = c("SL.glm.interaction","SL.glmnet","SL.gam")){
+IdentifyHTE <- function(scenario_p,raw_scenario,SL.library = c("SL.glm.interaction","SL.glmnet","SL.gam"),point){
   var <- scenario_p$scenario_var
   W_names <- grep('W',names(var),value = T)
 
-  fitdat <- data.frame(Y=raw_scenario$X50,var)
+  fitdat <- data.frame(Y=raw_scenario[,point],var)
 
   g.SL.1  <- SuperLearner(Y=fitdat$Y, X=fitdat[,W_names], SL.library=SL.library, family="gaussian")
   eval(parse(text=paste0("sample1 <- data.frame(",W_names[1],"=c(1:10000))")))
@@ -185,7 +244,7 @@ IdentifyHTE <- function(scenario_p,raw_scenario,SL.library = c("SL.glm.interacti
   ))
 }
 
-Identified.HTE <- IdentifyHTE(scenario_p,raw_scenario)
+Identified.HTE <- IdentifyHTE(scenario_p,raw_scenario,point=8)
 
 Identified.HTE$orderSD
 
@@ -210,7 +269,6 @@ g = ggplot(data=HTE.data,aes(x=key,y=value)) + labs(x = "Covariate",y = "")+
 
 
 #Subgroup
-
 subgroupCI <- function(scenario_p ,convery.idx,ii){
   sample.ii <- scenario_p$TMLE_estimation[convery.idx==ii,]
   psi.i <-  colMeans(sample.ii)
@@ -224,9 +282,11 @@ subgroupCI <- function(scenario_p ,convery.idx,ii){
 
 compute_group <- function(scenario_p ,step,wname){
   controls <- scenario_p$scenario_var
+
+  
   W_names <- grep('W',names(var),value = T)
   eval(parse(text=paste0("selection <- controls$",wname)))
-  n1<-seq(0,max(selection)/2,max(selection)/2/step)
+  n1<-seq(min(selection),max(selection),length.out = step)
   convery.idx <- selection
   maEnbk1 <- list();
   for (ii in 1:step){
@@ -235,9 +295,8 @@ compute_group <- function(scenario_p ,step,wname){
     convery.idx[I] <- ii
   }
   table(convery.idx)
-  convery.idx[which(convery.idx<1)] = round(convery.idx[which(convery.idx<1)])
-  convery.idx <- ifelse(convery.idx==0,2,convery.idx)
   step <- max(convery.idx)
+  #plot(data.frame(X=controls$W_age,Y= convery.idx))
   return(list(step=step,
               convery.idx=convery.idx))
 }
@@ -257,16 +316,21 @@ compute_effect <- function(scenario_p,step,wname,endtime){
   return(plyr::ldply(Psi_group, function(x) x))
 }
 
-kernal_process <- function(scenario,scenario_tmle,scenario_EIC,step,wname='W_mi_count',endtime=100){
+kernal_process <- function(scenario,scenario_tmle,scenario_EIC,step,wname='W_age',endtime=15){
   effect_by_sample <- list()
-  scenario_p_v2 <- get_result_2(scenario,scenario_tmle,scenario_EIC,data_out)
-  effect_by_sample[[i]] <- compute_effect(scenario_p = scenario_p_v2,step=step,wname,endtime)
-
-  effect_by_sample_p <- plyr::ldply(effect_by_sample, function(x) x)
-  effect_grouped_psi <- aggregate(effect_by_sample_p[,c("psi.i","sd_EIC","upper_CI","lower_CI")],
-                                  by=list(time = effect_by_sample_p$x,group=effect_by_sample_p$group), mean)
-  effect_grouped_sd <- aggregate(effect_by_sample_p[,c("psi.i","sd_EIC","upper_CI","lower_CI")],
-                                 by=list(time = effect_by_sample_p$x,group=effect_by_sample_p$group), sd)
+  scenario_p_v2 <- compose_result(scenario,scenario_tmle,scenario_EIC,data_out)
+  effect_by_sample <- compute_effect(scenario_p = scenario_p_v2,step=step,wname,endtime)
+  # effect_grouped_psi <- aggregate(effect_by_sample[,c("psi.i","sd_EIC","upper_CI","lower_CI")],
+  #                                 by=list(time = effect_by_sample$x,group=effect_by_sample$group), mean)
+  # 
+  # effect_grouped_sd <- aggregate(effect_by_sample[,c("psi.i","sd_EIC","upper_CI","lower_CI")],
+  #                                by=list(time = effect_by_sample$x,group=effect_by_sample$group), sd)
+  effect_by_sample$time <- effect_by_sample$x
+  
+  effect_grouped_psi <- effect_by_sample
+  effect_grouped_sd <- effect_by_sample
+  
+  apply(effect_by_sample,2,sd)
   effect_grouped_psi$sd_EIC <- effect_grouped_sd$sd_EIC
   effect_grouped_psi$upper_CI <- effect_grouped_psi$psi.i+1.96*effect_grouped_sd$sd_EIC/sqrt(50)
   effect_grouped_psi$lower_CI <- effect_grouped_psi$psi.i-1.96*effect_grouped_sd$sd_EIC/sqrt(50)
@@ -276,20 +340,26 @@ kernal_process <- function(scenario,scenario_tmle,scenario_EIC,step,wname='W_mi_
 names(data_out)
 
 kernal_p <- kernal_process(scenario = list(Estimation),
-                             scenario_tmle = list(TMLE_estimation),
+                            scenario_tmle = list(TMLE_estimation),
                              scenario_EIC = list(EIC),step = 10,
                              wname = 'W_age')
 
 kernal_p <- data.frame(group = "Test",kernal_p)
 
 kernal_plot <- rbind(kernal_p)
-kernal_plot$group.1 <- kernal_plot$group.1/2
+kernal_plot$group.1 <- kernal_plot$group.1/10
 
+plot(data.frame(X=data_out$W_age,Y=Estimation[,10]))
+plot(data.frame(X=data_out$W_gender,Y=Estimation[,10]))
+plot(data.frame(X=data_out$W_age,Y=scenario_p_v2$Estimation$`15`))
+
+
+plot(data.frame(X=controls$W_age,Y=  Estimation[,14]))
 
 
 g=ggplot(kernal_plot) +
-  geom_line(data=subset(kernal_plot,time == '12'), aes(x = group.1, y = psi.i,lty = group), size=.7)+
-  geom_ribbon(data=subset(kernal_plot,time == '12'), aes(ymin=lower_CI,ymax=upper_CI,x=group.1,group=group),
+  geom_line(data=subset(kernal_plot,time == '5'), aes(x = group.1, y = psi.i,lty = group), size=.7)+
+  geom_ribbon(data=subset(kernal_plot,time == '5'), aes(ymin=lower_CI,ymax=upper_CI,x=group.1,group=group),
               alpha=0.2)+
   scale_linetype_manual("",values=c("twodash", "solid","longdash","dotdash","dotted"))+
   theme_hc()+xlab("X\U2082") +ylab("CATE") +
