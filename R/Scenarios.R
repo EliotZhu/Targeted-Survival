@@ -1,6 +1,15 @@
 #' get the simulation scenario
 #' @export
-get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,confoundlevel=1,confoundlevel_cen=1){
+get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,confoundlevel=4,p=1){
+  mypoly <- function(x){
+    out <- data.frame("X1"=x)
+    for (i in 1:p){
+      eval(parse(text= paste0("out$X",i," <- x^i")))
+    }
+    return(apply(out,1,sum))
+  }
+
+
   D <- DAG.empty()
   D <- D +
     node("W1", distr ="runif", min = 0, max = 1)+
@@ -8,23 +17,23 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
     node("W3", distr ="rbinom", prob = .5,size=1)+
     node("W4", distr ="rbinom", prob = .5,size=1)
   if(conmode == "scenario 3"){
-    for (i in 5:5){
+    for (i in 5:20){
       D <- D +eval(parse(text= paste0("node('W",i,"', distr ='rbinom', prob = .1,size=1)")))
     }
-
     D <- D+ node("odds",distr = "rconst", const = confoundlevel*(W1+W2+W3+W4)/4)+
         #node("A", distr = "rbinom", size = 1, prob = ifelse(W1==1,1,0)) +
-        node("A", distr = "rbinom", size = 1, prob = 0.1+ odds / (1 + odds)) +
-        node("rate",distr = "rconst", const = ((W1+W2+W3+W4)*A+W1+W2+W3+W4)/ratDiv)+
+        node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
+        node("rate",distr = "rconst", const = ((mypoly(W1)+cos(W2)+mypoly(W3)+W4)*A+
+                                                mypoly(W1)+cos(W2)+mypoly(W3)+W4)/ratDiv)+
         node("Cweib", distr = "rweibull", shape = 1+W5/5, scale = 50)+
         node("Trexp", distr = "rexp", rate = rate) +
-        node("T", distr = "rconst", const = round(Trexp/10)) +
-        node("C", distr = "rconst", const = round(Cweib/10)) 
+        node("T", distr = "rconst", const = round(Trexp/11)) +
+        node("C", distr = "rconst", const = round(Cweib/11)) 
     wnames <- grep('W',names(D),value = T)
     true_surv <- function(x,tgrid,A){
       x <- as.matrix(x,nrow=1)
-      rate <- as.numeric((x[1]+x[2]+x[3]+x[4])*A+x[1]+x[2]+x[3]+x[4])
-      s_diff_true <-    1 - pexp(seq(0,tgrid,1)*10, rate = rate/ratDiv)
+      rate <- as.numeric((mypoly(x[1])+cos(x[2])+mypoly(x[3])+x[4])*A+mypoly(x[1])+cos(x[2])+mypoly(x[3])+x[4])
+      s_diff_true <-    1 - pexp(seq(0,tgrid,1)*11, rate = rate/ratDiv)
       return(s_diff_true)
     }
   }else if(conmode == "scenario s"){
@@ -43,11 +52,25 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
     }
     
   }else if(conmode == "no"){
-    D <- D+ node("odds",distr = "rconst", const = 0.2+W1+W2+W3+W4)+
+    for (i in 5:20){
+      D <- D +eval(parse(text= paste0("node('W",i,"', distr ='rbinom', prob = .1,size=1)")))
+    }
+    
+    D <- D+ node("odds",distr = "rconst", const = 1)+
+      #node("A", distr = "rbinom", size = 1, prob = ifelse(W1==1,1,0)) +
       node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
-      node("rate",distr = "rconst", const = (W1+W2+W5+W6)*A+W3+W4+W7+W8)+
-      node("Cweib", distr = "rweibull", shape = 1+(W5+W6+W7+W8)/5, scale = 50) 
-    wnames <- c('W1','W2','W3','W4','W5','W6','W7','W8','W9','W10')
+      node("rate",distr = "rconst", const = ((W1^2+W2+W3^2+W4)*A+W1^2+W2+W3^2+W4)/ratDiv)+
+      node("Cweib", distr = "rweibull", shape = 1+W5/5, scale = 50)+
+      node("Trexp", distr = "rexp", rate = rate) +
+      node("T", distr = "rconst", const = round(Trexp/10)) +
+      node("C", distr = "rconst", const = round(Cweib/10)) 
+    wnames <- grep('W',names(D),value = T)
+    true_surv <- function(x,tgrid,A){
+      x <- as.matrix(x,nrow=1)
+      rate <- as.numeric((x[1]^2+x[2]+x[3]^2+x[4])*A+x[1]^2+x[2]+x[3]^2+x[4])
+      s_diff_true <-    1 - pexp(seq(0,tgrid,1)*10, rate = rate/ratDiv)
+      return(s_diff_true)
+    }
   }else if(conmode == "scenario HTE 1"){
     for (i in 10:30){
       D <- D +eval(parse(text= paste0("node('W",i,"', distr ='runif', min = 0, max = 1)")))
@@ -66,7 +89,7 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
   setD <- set.DAG(D)
 
   dat <- sim(setD,n=samplesize,rndseed= iti)
-  dat2 <- sim(setD,n=20000,rndseed= iti)
+  dat2 <- sim(setD,n=5000,rndseed= iti)
   data_out <- dat[,names(dat) %in% c("ID",wnames,"A","T.tilde","Delta" )]
   data_out2 <- dat[,names(dat2) %in% c("ID",wnames,"A","T.tilde","Delta" )]
   

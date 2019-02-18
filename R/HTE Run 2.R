@@ -5,8 +5,8 @@ library(survminer)
 library(simcausal)
 library(here,usethis)
 
-n_sim = 1000
-simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=100,confoundlevel = 1,confoundlevel_cen=1)
+n_sim = 500
+simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=100,confoundlevel = 1,p=10)
 df <- simulated$dat
 df <- df[complete.cases(df),]
 table(df$Delta)/nrow(df)
@@ -15,6 +15,7 @@ hist(df$W1[df$A==1],col=rgb(0,0,1,0.5))
 hist(df$W1[df$A==0],col=rgb(1,0,0,0.5),add = T)
 hist(df$W2[df$A==1],col=rgb(0,0,1,0.5))
 hist(df$W2[df$A==0],col=rgb(1,0,0,0.5),add = T)
+
 
 
 adjustVars <- simulated$wnames
@@ -110,6 +111,8 @@ lines(abs(b$Sl),type = 'l',lty=2)
 
 
 
+
+
 moss_hazard_ate_fit <- MOSS_hazard_ate$new(
   A = df$A,
   T_tilde = df$T.tilde,
@@ -121,8 +124,8 @@ moss_hazard_ate_fit <- MOSS_hazard_ate$new(
   g1W = sl_fit$g1W,
   k_grid = k_grid
 )
-psi_moss_hazard_ate_1 <- moss_hazard_ate_fit$iterate_onestep(
-  epsilon = 1e-2 / n_sim, max_num_interation = 2e1, verbose = T)
+psi_moss_hazard_ate_1 <- moss_hazard_ate_fit$iterate_onestep(epsilon = 1e-1 / n_sim, 
+                                                             max_num_interation = 2e1, verbose = T)
 moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_hazard_ate_1)
 
 
@@ -138,24 +141,3 @@ lines(abs(c$SL),type = 'l',lty=3)
 
 
 
-
-
-
-
-
-
-
-
-
-ConvertedY <- sl_fit$density_failure_1$survival[,10]
-ConvertedY[df$A==0] <- sl_fit$density_failure_0$survival[,10][df$A==0]
-result3 <- tmle::tmle(Y=ConvertedY,
-                A=df$A,
-                W=data.frame(df[, adjustVars]), 
-                Delta=df$Delta)
-print(result3)
-result3$estimates$ATE
-
-tmle::tmle()
-
-mean(1/sl_fit$g1W*sl_fit$density_failure_1$survival[,10])-mean(1/(1-sl_fit$g1W)*sl_fit$density_failure_0$survival[,10])
