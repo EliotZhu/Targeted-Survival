@@ -23,8 +23,8 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
     D <- D+ node("odds",distr = "rconst", const = confoundlevel*(W1+W2+W3+W4)/4)+
         #node("A", distr = "rbinom", size = 1, prob = ifelse(W1==1,1,0)) +
         node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
-        node("rate",distr = "rconst", const = ((mypoly(W1)+cos(W2)+mypoly(W3)+W4)*A+
-                                                mypoly(W1)+cos(W2)+mypoly(W3)+W4)/ratDiv)+
+        node("rate",distr = "rconst", const = ((mypoly(W1)+W2+mypoly(W3)+W4)*A+
+                                                mypoly(W1)+W2+mypoly(W3)+W4)/ratDiv)+
         node("Cweib", distr = "rweibull", shape = 1+W5/5, scale = 50)+
         node("Trexp", distr = "rexp", rate = rate) +
         node("T", distr = "rconst", const = round(Trexp/11)) +
