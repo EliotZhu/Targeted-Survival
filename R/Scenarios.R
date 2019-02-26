@@ -89,7 +89,7 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
   setD <- set.DAG(D)
 
   dat <- sim(setD,n=samplesize,rndseed= iti)
-  dat2 <- sim(setD,n=5000,rndseed= iti)
+  dat2 <- sim(setD,n=10,rndseed= iti)
   data_out <- dat[,names(dat) %in% c("ID",wnames,"A","T.tilde","Delta" )]
   data_out2 <- dat[,names(dat2) %in% c("ID",wnames,"A","T.tilde","Delta" )]
   

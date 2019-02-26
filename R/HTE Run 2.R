@@ -71,8 +71,9 @@ case_simu <- function(p,ratDiv){
     max_num_interation = 1e2,
     verbose = F
   )
-  
+
   eic_1 <- moss_fit$eic_out
+  moss_fit1 <- moss_fit
   
   moss_fit <- MOSS$new(
     A = df$A,
@@ -91,9 +92,11 @@ case_simu <- function(p,ratDiv){
     verbose = F
   )
   eic_0 <- moss_fit$eic_out
+  moss_fit0 <- moss_fit
   
-  moss_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_1)
-  moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
+  
+  #moss_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_1)
+  #moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
   
   
   controls <- simulated$dat2[,grep("W",names( simulated$dat2),value = T)]
@@ -144,8 +147,8 @@ case_simu <- function(p,ratDiv){
   # lines(abs(c$SL),type = 'l',lty=3)
   
   
-  out <- list(moss_fit_1 = moss_fit_1,
-              moss_fit_0 = moss_fit_0,
+  out <- list(moss_fit_1 = moss_fit1,
+              moss_fit_0 = moss_fit0,
               sl_fit_1 = sl_fit$density_failure_1,
               sl_fit_0 = sl_fit$density_failure_0,
               true.1 = true.1,
@@ -166,3 +169,93 @@ case1 <- case_simu(1,140)
 case2 <- case_simu(5,300)
 case3 <- case_simu(15,600)
 case4 <- case_simu(30,800)
+
+case1.1 <- case_simu(1,490)
+case2.1 <- case_simu(5,1100)
+case3.1 <- case_simu(15,2000)
+case4.1 <- case_simu(30,3300)
+
+case1.2 <- case_simu(1,1300)
+case2.2 <- case_simu(5,3100)
+case3.2 <- case_simu(15,6100)
+case4.2 <- case_simu(30,7000)
+
+case1.3 <- case_simu(1,11000)
+case2.3 <- case_simu(5,40000)
+case3.3 <- case_simu(15,64000)
+case4.3 <- case_simu(30,105000)
+
+
+
+compose_result <- function(case){
+    Estimation <- case$sl_fit_1$survival - case$sl_fit_0$survival
+    SD <- Estimation %>% apply(2,sd) %>% as.vector()
+    Estimation_average <-  colMeans(Estimation)
+
+    TMLE_estimation <- case$moss_fit_1$density_failure$survival-case$moss_fit_0$density_failure$survival
+    SD_t <- TMLE_estimation %>%apply(2,sd) %>% as.vector()
+    Estimation_average_t <- colMeans(TMLE_estimation)
+
+    EIC_estimation <- case$eic_diff
+    True.eff <- case$true.1-case$true.0
+    True_average <- colMeans(True.eff)
+    
+    Bias <- Estimation-True.eff
+    RMSE <- colMeans(Bias^2) %>% sqrt()
+    NRMSE <- RMSE/abs(Estimation_average)
+    
+    Bias_t <- TMLE_estimation-True.eff
+    RMSE_t <- colMeans(Bias_t^2) %>% sqrt()
+    NRMSE_t <- RMSE_t/abs((Estimation_average_t))
+    
+
+    return(list(
+      Estimation=Estimation,
+      TMLE_estimation= TMLE_estimation,
+      True.eff = True.eff,
+      EIC_estimation=EIC_estimation,
+
+      Summary=data.frame(Time=1:ncol(True.eff), SD=SD,SD_t=SD_t,
+                         RMSE=NRMSE,RMSE_t=NRMSE_t,
+                         Mean = Estimation_average ,
+                         TMLE = Estimation_average_t ,
+                         pBias = paste0(round(((Estimation_average-True_average)/Estimation_average),4)*100,"%"),
+                         pBias_t = paste0(round(((Estimation_average_t-True_average)/Estimation_average_t),4)*100,"%"),
+                         true = True_average
+      )
+    ))
+}
+scenario1 <- compose_result(case1)
+scenario2 <- compose_result(case2)
+scenario3 <- compose_result(case3)
+scenario4 <- compose_result(case4)
+
+scenario1.1 <- compose_result(case1.1)
+scenario2.1 <- compose_result(case2.1)
+scenario3.1 <- compose_result(case3.1)
+scenario4.1 <- compose_result(case4.1)
+
+scenario1.2 <- compose_result(case1.2)
+scenario2.2 <- compose_result(case2.2)
+scenario3.2 <- compose_result(case3.2)
+scenario4.2 <- compose_result(case4.2)
+
+scenario1.3 <- compose_result(case1.3)
+scenario2.3 <- compose_result(case2.3)
+scenario3.3 <- compose_result(case3.3)
+scenario4.3 <- compose_result(case4.3)
+
+diagnose.data <- rbind(scenario1$Summary,scenario2$Summary,scenario3$Summary,scenario4$Summary,
+                       scenario1.1$Summary,scenario2.1$Summary,scenario3.1$Summary,scenario4.1$Summary,
+                       scenario1.2$Summary,scenario2.2$Summary,scenario3.2$Summary,scenario4.2$Summary,
+                       scenario1.3$Summary,scenario2.3$Summary,scenario3.3$Summary,scenario4.3$Summary)
+diagnose.data.out.2 <-diagnose.data[diagnose.data$Time=="2",]
+diagnose.data.out.9 <-diagnose.data[diagnose.data$Time=="9",]
+diagnose.data.out.18 <-diagnose.data[diagnose.data$Time=="18",]
+
+
+write.csv(diagnose.data, file = paste0(getwd(),'/Result/diagnose.data.csv') , row.names = FALSE)
+
+
+
+

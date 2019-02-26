@@ -4,9 +4,17 @@ data_out <- Blanca[,c('female',"age","imd2015","prev_vka","af_hospital","mi_coun
                       "ckd_count","can_count","charlson_index_2y","vas_count","hyp_count",
                       "chadvasc_index_2y","bleed_count","alch_count","nsaid_asp_count","l_inr_count","hasbled_index_2y")]
 
+Blanca <- Blanca_v1
+data_out <- Blanca[,c('female',"age","imd2015","prev_vka","af_hospital","mi_count",
+                      "chf_count","pvd_count","cvd_count","dem_count","copd_count","rhe_count","dtm_u_count","dtm_c_count",
+                      "ckd_count","can_count","charlson_index_2y","vas_count","hyp_count",
+                      "chadvasc_index_2y","bleed_count","alch_count","nsaid_asp_count","l_inr_count","hasbled_index_2y")]
+
+
 data_out[is.na(data_out)] <- 0
 data_out <- as.data.frame(apply(data_out, 2, as.numeric))
 apply(data_out, 2,function(x) round(length(which(x==0))/length(x)*100,4))
+
 
 normalise <-  function(x){
   if(length(unique(x))<=2){
@@ -21,11 +29,42 @@ data_out <- as.data.frame(apply(data_out,2,function(x) normalise(x)))
 
 names(data_out) <- paste("W",names(data_out),sep = "_")
 adjustVars <- names(data_out)
-Blanca$combodate <- as.Date(Blanca$combodate, "%Y-%m-%d")
-Blanca$af_start <- as.Date(Blanca$af_start, "%Y-%m-%d")
+#Blanca$combodate <- as.Date(Blanca$combodate, "%Y-%m-%d")
+Blanca$issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
+#Blanca$mbdate <- as.Date(Blanca$mbdate, "%Y-%m-%d")
+#Blanca$dod <- as.Date(Blanca$dod, "%Y-%m-%d")
+
 Blanca$af_end <- as.Date(Blanca$af_end, "%Y-%m-%d")
+Blanca$af_start <- as.Date(Blanca$af_start, "%Y-%m-%d")
+Blanca$appendage_occlusion_date <- as.Date(Blanca$appendage_occlusion_date, "%Y-%m-%d")
+#Blanca$cardioversion_date<- as.Date(Blanca$cardioversion_date, "%Y-%m-%d")
+#Blanca$ablation_date <- as.Date(Blanca$ablation_date, "%Y-%m-%d")
+
+
+#Blanca$cardioversion_date[which(is.na(Blanca$cardioversion_date))] <- Blanca$af_end[which(is.na(Blanca$cardioversion_date))]
+#Blanca$ablation_date[which(is.na(Blanca$ablation_date))] <- Blanca$af_end[which(is.na(Blanca$ablation_date))]
+Blanca$appendage_occlusion_date[which(is.na(Blanca$appendage_occlusion_date))] <- Blanca$af_end[which(is.na(Blanca$appendage_occlusion_date))]
+
+#Blanca$cardioversion_date <-  as.Date(Blanca$cardioversion_date, "%Y-%m-%d")
+#Blanca$ablation_date <-  as.Date(Blanca$ablation_date, "%Y-%m-%d")
+
+
+Blanca$af_end[Blanca$af_end>Blanca$appendage_occlusion_date] <- Blanca$appendage_occlusion_date[Blanca$af_end>Blanca$appendage_occlusion_date] 
+#Blanca$af_end[Blanca$af_end>Blanca$cardioversion_date] <- Blanca$cardioversion_date[Blanca$af_end>Blanca$cardioversion_date] 
+#Blanca$af_end[Blanca$af_end>Blanca$ablation_date] <- Blanca$ablation_date[Blanca$af_end>Blanca$ablation_date] 
+
+
+
+Blanca$af_end <-  as.Date(Blanca$af_end, "%Y-%m-%d")
+
+
 follow_up <- Blanca$af_end-Blanca$af_start
-event_time <- Blanca$combodate-Blanca$af_start
+#event_time <- Blanca$combodate-Blanca$af_start
+event_time <- Blanca$issedate-Blanca$af_start
+#event_time <- Blanca$mbdate-Blanca$af_start
+#event_time <- Blanca$dod-Blanca$af_start
+
+
 data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
 data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
 data_out$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
@@ -154,6 +193,50 @@ tmle_scenario <- data.frame(group = "TMLE",scenario_p$TMLE_estimation)
 
 plot(scenario_p$Summary$SD,type='l',lty=4)
 lines(scenario_p$Summary$SD_t,type='l')
+
+
+
+#---------------------Plot Large Violin---------------------
+violin.data <-raw_scenario
+names(violin.data) <- gsub("X","Time:",names(violin.data))
+violin.data <- reshape2::melt(violin.data, id.vars=c("group"), value.name = "value")
+violin.data$type <- "SL"
+
+violin.tmle <- tmle_scenario
+names(violin.tmle) <- gsub("X","Time:",names(violin.tmle))
+violin.tmle <- reshape2::melt(violin.tmle, id.vars=c("group"), value.name = "value")
+violin.tmle$type <- "MOSS"
+names(violin.tmle) <- names(violin.data)
+
+violin.data <- rbind(violin.tmle,violin.data)
+violin.data.1 <- violin.data #%>% group_by(variable) %>% sample_n(1000)
+violin.data.1 <- violin.data.1[violin.data.1$variable=="Time:12"|violin.data.1$variable=="Time:2"|violin.data.1$variable=="Time:6",]
+table(violin.data.1$type)
+
+
+
+vl.avg <- aggregate(violin.data$value, by=list(group = violin.data$group,variable=violin.data$variable,type = violin.data$type), mean)
+vl.avg$value <- vl.avg$x
+vl.avg <- vl.avg[vl.avg$variable=="Time:12"|vl.avg$variable=="Time:2"|vl.avg$variable=="Time:6",]
+
+g = ggplot(data=violin.data.1,aes(x=group,y=value)) + labs(x = "",y = "Treatment Effect")+theme_hc()+ ylim(c(0,0.04))+
+  geom_violin(data=subset(violin.data.1,type == 'MOSS'),aes(fill = "#F9BA32"),  alpha = 0.4,color=NA,lwd=.1,scale="width")+
+  geom_violin(data=subset(violin.data.1,type == 'SL'),aes(fill = "#426E86"), alpha = 0.4, color=NA,lwd=.1,scale="width")+
+  geom_point(data = subset(vl.avg,type == 'MOSS'),  alpha = .8, size = 2,color="#F9BA32",shape=3,stroke = 1)+
+  geom_point(data = subset(vl.avg,type == 'SL'), alpha = .8, size = 2, color="#426E86",shape=3,stroke = 1)+
+  scale_fill_manual("",values= c(alpha(c("#426E86","#F9BA32"),.4)),labels = c("ITE(SL)","ITE(TMLE)"))+
+  facet_wrap(~variable,ncol=1,strip.position = "bottom")+coord_flip()+
+  theme(legend.spacing.y = unit(0, "mm"),
+        panel.border = element_rect(colour = "white", fill=NA),
+        aspect.ratio = .3, axis.text = element_text(colour = 1, size = 10),
+        strip.background = element_blank(),
+        legend.background = element_blank(),
+        legend.box.background = element_rect(colour = NA,fill = "#FFFFFF"))
+ggsave("CH3_large_violin.png", plot = g, device = 'png', path = paste0(getwd(),'/GFX'),
+       scale = 1, width = 130, height = 150, units = c("mm"), dpi = 300)
+
+
+
 
 #---------------------Indentify HTE ---------------------------
 
