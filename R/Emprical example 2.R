@@ -5,64 +5,80 @@ data_out <- Blanca[,c('female',"age","imd2015","prev_vka","af_hospital","mi_coun
                       "chadvasc_index_2y","bleed_count","alch_count","nsaid_asp_count","l_inr_count","hasbled_index_2y")]
 
 Blanca <- Blanca_v1
-data_out <- Blanca[,c('female',"age","imd2015","prev_vka","af_hospital","mi_count",
+adjustVars <- Blanca[,c('female',"age","imd2015","prev_vka","af_hospital","mi_count","paroxysmal","chronic",
+                      "typical_flutter","atypical_flutter","esrf_count","mi_count","giu_count","liv_m_count",
                       "chf_count","pvd_count","cvd_count","dem_count","copd_count","rhe_count","dtm_u_count","dtm_c_count",
                       "ckd_count","can_count","charlson_index_2y","vas_count","hyp_count",
+                      "stroke_count","Coronary.artery.operations_count","Antiarrythmics_count","Antidiabetics_count",
+                      "Antihypertensives_count","Aspirin_count","Betablocker.Antiarrythmics_count","Betablockers_count",
+                      "Clopidogrel_count","CP450_Inhibitors_count","Dipyridamole_count","Fibrinolytic.Drugs_count",
+                      "NOAC_count","NSAID_count","Parenteral.Anticoagulants_count","Prasugrel_count","Proton.Pump.Inhibitors_count",
+                      "Rifampicin_count","Selected.Anticonvulsants_count","Selective.Serotonin.Re.uptake.Inhibitors_count",
+                      "Statins_count","Ticagrelor_count","Ticlopidine_count","VKA_count",
                       "chadvasc_index_2y","bleed_count","alch_count","nsaid_asp_count","l_inr_count","hasbled_index_2y")]
 
-
-data_out[is.na(data_out)] <- 0
-data_out <- as.data.frame(apply(data_out, 2, as.numeric))
-apply(data_out, 2,function(x) round(length(which(x==0))/length(x)*100,4))
-
+group_choice <-  Blanca[,c("age","prev_vka","esrf_count","Coronary.artery.operations_count","Aspirin_count",
+                           "Prasugrel_count","chadvasc_index_2y")]
 
 normalise <-  function(x){
   if(length(unique(x))<=2){
     x <- x
+  }else if(length(which(x==0))/length(x)>=0.9){
+    x <- ifelse(x==0,0,1)
   }else{
     x <- (x-min(x))/(max(x)-min(x))
   }
 }
-data_out <- as.data.frame(apply(data_out,2,function(x) normalise(x)))
 
 
+adjustVars[is.na(adjustVars)] <- 0
+adjustVars <- as.data.frame(apply(adjustVars, 2, as.numeric))
+apply(adjustVars, 2,function(x) round(length(which(x==0))/length(x)*100,4))
+table(adjustVars$charlson_index_2y)
 
-names(data_out) <- paste("W",names(data_out),sep = "_")
-adjustVars <- names(data_out)
-#Blanca$combodate <- as.Date(Blanca$combodate, "%Y-%m-%d")
-Blanca$issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
-#Blanca$mbdate <- as.Date(Blanca$mbdate, "%Y-%m-%d")
-#Blanca$dod <- as.Date(Blanca$dod, "%Y-%m-%d")
-
-Blanca$af_end <- as.Date(Blanca$af_end, "%Y-%m-%d")
-Blanca$af_start <- as.Date(Blanca$af_start, "%Y-%m-%d")
-Blanca$appendage_occlusion_date <- as.Date(Blanca$appendage_occlusion_date, "%Y-%m-%d")
-#Blanca$cardioversion_date<- as.Date(Blanca$cardioversion_date, "%Y-%m-%d")
-#Blanca$ablation_date <- as.Date(Blanca$ablation_date, "%Y-%m-%d")
+adjustVars <- as.data.frame(apply(adjustVars,2,function(x) normalise(x)))
+names(adjustVars) <- paste("W",names(adjustVars),sep = "_")
+adjustVars_name <- names(adjustVars)
+data_out <- adjustVars
 
 
-#Blanca$cardioversion_date[which(is.na(Blanca$cardioversion_date))] <- Blanca$af_end[which(is.na(Blanca$cardioversion_date))]
-#Blanca$ablation_date[which(is.na(Blanca$ablation_date))] <- Blanca$af_end[which(is.na(Blanca$ablation_date))]
-Blanca$appendage_occlusion_date[which(is.na(Blanca$appendage_occlusion_date))] <- Blanca$af_end[which(is.na(Blanca$appendage_occlusion_date))]
+#Get time 
+data_out$af_end <- as.Date(Blanca$af_end, "%Y-%m-%d")
+data_out$af_start <- as.Date(Blanca$af_start, "%Y-%m-%d")
+data_out$appendage_occlusion_date <- as.Date(Blanca$appendage_occlusion_date, "%Y-%m-%d")
+data_out$cardioversion_date<- as.Date(Blanca$cardioversion_date, "%Y-%m-%d")
+data_out$ablation_date <- as.Date(Blanca$ablation_date, "%Y-%m-%d")
 
-#Blanca$cardioversion_date <-  as.Date(Blanca$cardioversion_date, "%Y-%m-%d")
-#Blanca$ablation_date <-  as.Date(Blanca$ablation_date, "%Y-%m-%d")
+data_out$appendage_occlusion_date[which(is.na(data_out$appendage_occlusion_date))] <- Blanca$af_end[which(is.na(data_out$appendage_occlusion_date))]
+data_out$cardioversion_date[which(is.na(data_out$cardioversion_date))] <- Blanca$af_end[which(is.na(data_out$cardioversion_date))]
+data_out$ablation_date[which(is.na(data_out$ablation_date))] <- Blanca$af_end[which(is.na(data_out$ablation_date))]
+
+data_out$af_end[data_out$af_end>data_out$appendage_occlusion_date] <- Blanca$appendage_occlusion_date[data_out$af_end>data_out$appendage_occlusion_date] 
+data_out$af_end[data_out$af_end>data_out$cardioversion_date] <- Blanca$cardioversion_date[data_out$af_end>data_out$cardioversion_date] 
+data_out$af_end[data_out$af_end>data_out$ablation_date] <- Blanca$ablation_date[data_out$af_end>data_out$ablation_date] 
+
+data_out$af_end <-  as.Date(Blanca$af_end, "%Y-%m-%d")
+follow_up <- data_out$af_end-data_out$af_start
 
 
-Blanca$af_end[Blanca$af_end>Blanca$appendage_occlusion_date] <- Blanca$appendage_occlusion_date[Blanca$af_end>Blanca$appendage_occlusion_date] 
-#Blanca$af_end[Blanca$af_end>Blanca$cardioversion_date] <- Blanca$cardioversion_date[Blanca$af_end>Blanca$cardioversion_date] 
-#Blanca$af_end[Blanca$af_end>Blanca$ablation_date] <- Blanca$ablation_date[Blanca$af_end>Blanca$ablation_date] 
+#Event stroke
+issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
+event_time <- issedate-data_out$af_start
 
 
+#Event combine
+combodate <- as.Date(Blanca$combodate, "%Y-%m-%d")
+event_time <- combodate-data_out$af_start
 
-Blanca$af_end <-  as.Date(Blanca$af_end, "%Y-%m-%d")
 
+#Event bleeding
+mbdate <- as.Date(Blanca$mbdate, "%Y-%m-%d")
+event_time <- mbdate-data_out$af_start
 
-follow_up <- Blanca$af_end-Blanca$af_start
-#event_time <- Blanca$combodate-Blanca$af_start
-event_time <- Blanca$issedate-Blanca$af_start
-#event_time <- Blanca$mbdate-Blanca$af_start
-#event_time <- Blanca$dod-Blanca$af_start
+#Event death
+dod <- as.Date(Blanca$dod, "%Y-%m-%d")
+event_time <- dod-data_out$af_start
+
 
 
 data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
@@ -81,69 +97,122 @@ table(data_out$Delta[data_out$T.tilde<100])/nrow(data_out)
 table(data_out$A)/nrow(data_out)
 
 #data_out <- data_out[idx,]
-data_out <- data_out[complete.cases(data_out),]
-df <- data_out
-sl_lib_g <- c("SL.mean", "SL.glm","SL.earth")
-sl_lib_censor <- c("SL.mean", "SL.glm","SL.earth")
-sl_lib_failure <- c("SL.mean", "SL.glm","SL.earth")
-df$T.tilde <- df$T.tilde + 1
-k_grid <- 1:max(df$T.tilde)
-n_sim <- nrow(df)
+df <- data_out[complete.cases(data_out),]
+df <- sample_n(df,1000)
+
+case_estimate <- function(df){
+  n_sim <- nrow(df)
+  k_grid <- 1:max(df$T.tilde)
+  require(MOSS)
+  message("SL")
+  sl_lib_g <- c("SL.mean", "SL.glm","SL.earth")
+  sl_lib_censor <- c("SL.mean", "SL.glm","SL.earth")
+  sl_lib_failure <- c("SL.mean", "SL.glm","SL.earth")
+  sl_fit <- initial_sl_fit(
+    ftime = df$T.tilde,
+    ftype = df$Delta,
+    trt = df$A,
+    adjustVars = data.frame(df[, names(adjustVars)]),
+    #adjustVars = df[,c('W','W1')],
+    t_0 = max(df$T.tilde),
+    SL.trt = sl_lib_g,
+    SL.ctime = sl_lib_censor,
+    SL.ftime = sl_lib_failure
+  )
+  sl_fit$density_failure_1$hazard_to_survival()
+  sl_fit$density_failure_0$hazard_to_survival()
+  # WILSON hack no data is t_tilde = 2
+  sl_fit$density_failure_1$t <- k_grid
+  sl_fit$density_failure_0$t <- k_grid
+  
+  
+  
+  message("moss")
+  moss_fit <- MOSS$new(
+    A = df$A,
+    T_tilde = df$T.tilde,
+    Delta = df$Delta,
+    density_failure = sl_fit$density_failure_1,
+    density_censor = sl_fit$density_censor_1,
+    g1W = sl_fit$g1W,
+    A_intervene = 1,
+    k_grid = k_grid
+  )
+  psi_moss_1 <- moss_fit$onestep_curve(
+    epsilon = 1e-1 / n_sim,
+    # epsilon = 1e-5,
+    max_num_interation = 1e2,
+    verbose = F
+  )
+  
+  eic_1 <- moss_fit$eic_out
+  moss_fit1 <- moss_fit
+  
+  moss_fit <- MOSS$new(
+    A = df$A,
+    T_tilde = df$T.tilde,
+    Delta = df$Delta,
+    density_failure = sl_fit$density_failure_0,
+    density_censor = sl_fit$density_censor_0,
+    g1W = sl_fit$g1W,
+    A_intervene = 0,
+    k_grid = k_grid
+  )
+  psi_moss_0 <- moss_fit$onestep_curve(
+    epsilon = 1e-1 / n_sim,
+    # epsilon = 1e-5,
+    max_num_interation = 1e2,
+    verbose = F
+  )
+  eic_0 <- moss_fit$eic_out
+  moss_fit0 <- moss_fit
+  
+  
+  #plot(sl_density_failure_1_marginal$survival %>% t(), lty = 1,type = 'l',col = 'blue')
+  #lines(sl_density_failure_0_marginal$survival %>% t(), lty = 1,type = 'l',col = 'red')
+  #lines(moss_fit1$density_failure$survival %>% colMeans(), lty = 2,type = 'l',col = 'blue')
+  #lines(moss_fit0$density_failure$survival %>% colMeans(), lty = 2,type = 'l',col = 'red')
+  
+  message("moss diff")
+  
+  moss_hazard_ate_fit <- MOSS_hazard_ate$new(
+    A = df$A,
+    T_tilde = df$T.tilde,
+    Delta = df$Delta,
+    density_failure = sl_fit$density_failure_1,
+    density_censor = sl_fit$density_censor_1,
+    density_failure_0 = sl_fit$density_failure_0,
+    density_censor_0 = sl_fit$density_censor_0,
+    g1W = sl_fit$g1W,
+    k_grid = k_grid
+  )
+  psi_moss_hazard_ate_1 <- moss_hazard_ate_fit$iterate_onestep(epsilon = 1e-1 / n_sim, 
+                                                               max_num_interation = 2e1, verbose = F)
+  moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_hazard_ate_1)
+  
+  
+  TMLE_diff = psi_moss_hazard_ate_1
+  SL_diff = (sl_density_failure_1_marginal$survival-sl_density_failure_0_marginal$survival) %>% t()
+  true_diff = (colMeans(true.1)-colMeans(true.0))
+  
+  
+  out <- list(moss_fit_1 = moss_fit1,
+              moss_fit_0 = moss_fit0,
+              sl_fit_1 = sl_fit$density_failure_1,
+              sl_fit_0 = sl_fit$density_failure_0,
+              eic_1 = eic_1,
+              eic_0 = eic_0,
+              TMLE_diff = TMLE_diff,
+              SL_diff = sl_fit$density_failure_1$survival-sl_fit$density_failure_0$survival,
+              eic_diff = moss_hazard_ate_fit$eic_out
+  )
+  
+  return(out)
+}  
+
+case_blanca_issedate <- case_estimate(df)
 
 
-library(MOSS)
-message("SL")
-sl_fit <- initial_sl_fit(
-  ftime = df$T.tilde,
-  ftype = df$Delta,
-  trt = df$A,
-  adjustVars = data.frame(df[, adjustVars]),
-  #adjustVars = df[,c('W','W1')],
-  t_0 = max(df$T.tilde),
-  SL.trt = sl_lib_g,
-  SL.ctime = sl_lib_censor,
-  SL.ftime = sl_lib_failure
-)
-sl_fit$density_failure_1$hazard_to_survival()
-sl_fit$density_failure_0$hazard_to_survival()
-# WILSON hack no data is t_tilde = 2
-sl_fit$density_failure_1$t <- k_grid
-sl_fit$density_failure_0$t <- k_grid
-
-
-sl_density_failure_1_marginal <- sl_fit$density_failure_1$clone(deep = TRUE)
-sl_density_failure_0_marginal <- sl_fit$density_failure_0$clone(deep = TRUE)
-sl_density_failure_1_marginal$survival <- matrix(colMeans(sl_density_failure_1_marginal$survival), nrow = 1)
-sl_density_failure_0_marginal$survival <- matrix(colMeans(sl_density_failure_0_marginal$survival), nrow = 1)
-ITE <- sl_fit$density_failure_1$survival-sl_fit$density_failure_0$survival
-
-
-eic_fit_1 <- eic$new(
-  A = df$A,
-  T_tilde = df$T.tilde,
-  Delta = df$Delta,
-  density_failure = sl_fit$density_failure_1,
-  density_censor = sl_fit$density_censor_1,
-  g1W = sl_fit$g1W,
-  psi = colMeans(sl_fit$density_failure_1$survival),
-  A_intervene = 1)$all_t(k_grid = k_grid)
-mean_eic_1 <- colMeans(eic_fit_1)
-
-eic_fit_0 <- eic$new(
-  A = df$A,
-  T_tilde = df$T.tilde,
-  Delta = df$Delta,
-  density_failure = sl_fit$density_failure_0,
-  density_censor = sl_fit$density_censor_0,
-  g1W = sl_fit$g1W,
-  psi = colMeans(sl_fit$density_failure_0$survival),
-  A_intervene = 1)$all_t(k_grid = k_grid)
-mean_eic_0 <- colMeans(eic_fit_0)
-
-
-
-plot(sl_density_failure_0_marginal$survival %>% t(), lty = 1,type = 'l',col = 'blue')
-lines(sl_density_failure_1_marginal$survival %>% t(), lty = 1,type = 'l',col = 'red')
 
 
 compose_result <- function(scenario, scenario_tmle, scenario_EIC,scenario_var = data_out){
@@ -193,6 +262,7 @@ tmle_scenario <- data.frame(group = "TMLE",scenario_p$TMLE_estimation)
 
 plot(scenario_p$Summary$SD,type='l',lty=4)
 lines(scenario_p$Summary$SD_t,type='l')
+
 
 
 
