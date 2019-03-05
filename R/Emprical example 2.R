@@ -61,46 +61,11 @@ data_out$af_end <-  as.Date(Blanca$af_end, "%Y-%m-%d")
 follow_up <- data_out$af_end-data_out$af_start
 
 
-#Event stroke
-issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
-event_time <- issedate-data_out$af_start
-
-
-#Event combine
-combodate <- as.Date(Blanca$combodate, "%Y-%m-%d")
-event_time <- combodate-data_out$af_start
-
-
-#Event bleeding
-mbdate <- as.Date(Blanca$mbdate, "%Y-%m-%d")
-event_time <- mbdate-data_out$af_start
-
-#Event death
-dod <- as.Date(Blanca$dod, "%Y-%m-%d")
-event_time <- dod-data_out$af_start
-
-
-
-data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
-data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
-data_out$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
-data_out$T.tilde <- round(data_out$T.tilde/180)
-data_out <- data_out[data_out$T.tilde<=200 & data_out$T.tilde>0,]
-
-
-
-table(data_out$T.tilde)
-hist(data_out$T.tilde)
-
-
-table(data_out$Delta[data_out$T.tilde<100])/nrow(data_out)
-table(data_out$A)/nrow(data_out)
-
-#data_out <- data_out[idx,]
-df <- data_out[complete.cases(data_out),]
-df <- sample_n(df,1000)
-
 case_estimate <- function(df){
+  require(dplyr)
+  df$T.tilde <- round(df$T.tilde/180)
+  df <- df[df$T.tilde<=200 & df$T.tilde>0,]
+  
   n_sim <- nrow(df)
   k_grid <- 1:max(df$T.tilde)
   require(MOSS)
@@ -124,7 +89,6 @@ case_estimate <- function(df){
   # WILSON hack no data is t_tilde = 2
   sl_fit$density_failure_1$t <- k_grid
   sl_fit$density_failure_0$t <- k_grid
-  
   
   
   message("moss")
@@ -172,9 +136,22 @@ case_estimate <- function(df){
   #lines(sl_density_failure_0_marginal$survival %>% t(), lty = 1,type = 'l',col = 'red')
   #lines(moss_fit1$density_failure$survival %>% colMeans(), lty = 2,type = 'l',col = 'blue')
   #lines(moss_fit0$density_failure$survival %>% colMeans(), lty = 2,type = 'l',col = 'red')
+
+
+  out <- list(moss_fit_1 = moss_fit1,
+              moss_fit_0 = moss_fit0,
+              sl_fit_1 = sl_fit$density_failure_1,
+              sl_fit_0 = sl_fit$density_failure_0,
+              sl_fit =sl_fit,
+              df = df, 
+              eic_1 = eic_1,
+              eic_0 = eic_0)
+  return(out)
+} 
+case_estimate_avg <- function(df,sl_fit){
+  require(dplyr)
   
   message("moss diff")
-  
   moss_hazard_ate_fit <- MOSS_hazard_ate$new(
     A = df$A,
     T_tilde = df$T.tilde,
@@ -184,33 +161,136 @@ case_estimate <- function(df){
     density_failure_0 = sl_fit$density_failure_0,
     density_censor_0 = sl_fit$density_censor_0,
     g1W = sl_fit$g1W,
-    k_grid = k_grid
+    k_grid = 1:max(df$T.tilde)
   )
   psi_moss_hazard_ate_1 <- moss_hazard_ate_fit$iterate_onestep(epsilon = 1e-1 / n_sim, 
-                                                               max_num_interation = 2e1, verbose = F)
+                                                               max_num_interation = 1e1, verbose = T)
   moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_hazard_ate_1)
   
-  
-  TMLE_diff = psi_moss_hazard_ate_1
-  SL_diff = (sl_density_failure_1_marginal$survival-sl_density_failure_0_marginal$survival) %>% t()
-  true_diff = (colMeans(true.1)-colMeans(true.0))
-  
-  
-  out <- list(moss_fit_1 = moss_fit1,
-              moss_fit_0 = moss_fit0,
-              sl_fit_1 = sl_fit$density_failure_1,
-              sl_fit_0 = sl_fit$density_failure_0,
-              eic_1 = eic_1,
-              eic_0 = eic_0,
-              TMLE_diff = TMLE_diff,
+  out <- list(TMLE_diff = moss_hazard_ate_fit$density_failure$survival-moss_hazard_ate_fit$density_failure_0$survival,
               SL_diff = sl_fit$density_failure_1$survival-sl_fit$density_failure_0$survival,
-              eic_diff = moss_hazard_ate_fit$eic_out
-  )
-  
+              eic_diff = moss_hazard_ate_fit$eic_out)
   return(out)
 }  
 
-case_blanca_issedate <- case_estimate(df)
+
+
+#Event stroke rivaroxaban
+issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
+event_time <- issedate-data_out$af_start
+data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+
+data_out$A <- ifelse( is.na(Blanca$rivaroxaban),0,1)
+data_out$A <- ifelse( is.na(Blanca$dabigatran),0,1)
+data_out$A <- ifelse( is.na(Blanca$apixaban),0,1)
+data_out$A <- ifelse( is.na(Blanca$edoxaban),0,1)
+
+
+df <- data_out[complete.cases(data_out),]
+
+#Event combine
+combodate <- as.Date(Blanca$combodate, "%Y-%m-%d")
+event_time <- combodate-data_out$af_start
+data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+data_out$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
+df <- data_out[complete.cases(data_out),]
+
+case_blanca_comb <- case_estimate(df)
+
+
+
+#Event stroke
+issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
+event_time <- issedate-data_out$af_start
+data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+data_out$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
+df <- data_out[complete.cases(data_out),]
+
+case_blanca_issedate <- case_estimate(sample_n(df,10000))
+
+
+ITE <- case_blanca_issedate$sl_fit_1$survival-case_blanca_issedate$sl_fit_0$survival
+a <- ITE[case_blanca_issedate$df$W_W_chadvasc_index_2y>=1/9&case_blanca_issedate$df$W_W_female==0,] %>% colMeans()
+b <- ITE[case_blanca_issedate$df$W_W_chadvasc_index_2y>=2/9&case_blanca_issedate$df$W_W_female==1,] %>% colMeans()
+
+eic <- case_blanca_issedate$eic_1-case_blanca_issedate$eic_0
+a1 <- apply(eic[case_blanca_issedate$df$W_W_chadvasc_index_2y>=1/9&case_blanca_issedate$df$W_W_female==0,],2,sd)/100
+b1 <- apply(eic[case_blanca_issedate$df$W_W_chadvasc_index_2y>=2/9&case_blanca_issedate$df$W_W_female==1,],2,sd)/100
+
+
+plot(b, lty = 1,type = 'l',col = 'red')
+lines(b-b1, lty = 2,type = 'l',col = 'red')
+lines(b+b1, lty = 2,type = 'l',col = 'red')
+lines(a, lty = 1,type = 'l',col = 'blue')
+lines(a-a1, lty = 2,type = 'l',col = 'blue')
+lines(a+a1, lty = 2,type = 'l',col = 'blue')
+
+
+age1 <- ITE[Blanca[rownames(case_blanca_issedate$df),'age']>=65,] %>% colMeans()
+age0 <- ITE[Blanca[rownames(case_blanca_issedate$df),'age']< 65,] %>% colMeans()
+
+plot(age1, lty = 1,type = 'l',col = 'red')
+lines(age0, lty = 1,type = 'l',col = 'blue')
+
+
+prevka_0 <- ITE[case_blanca_issedate$df$W_W_prev_vka==0,] %>% colMeans()
+prevka_1 <- ITE[case_blanca_issedate$df$W_W_prev_vka==1,] %>% colMeans()
+
+plot(prevka_1, lty = 1,type = 'l',col = 'red')
+lines(prevka_0, lty = 1,type = 'l',col = 'blue')
+
+
+CAO_1 <- ITE[case_blanca_issedate$df$W_W_Coronary.artery.operations_count==1,] %>% colMeans()
+CAO_0 <- ITE[case_blanca_issedate$df$W_W_Coronary.artery.operations_count==0,] %>% colMeans()
+plot(CAO_1, lty = 1,type = 'l',col = 'red')
+lines(CAO_0, lty = 1,type = 'l',col = 'blue')
+
+
+ant_1 <- ITE[case_blanca_issedate$df$W_W_Prasugrel_count==1 | case_blanca_issedate$df$W_W_Aspirin_count>0,] %>% colMeans()
+ant_0 <- ITE[case_blanca_issedate$df$W_W_Prasugrel_count==0 | case_blanca_issedate$df$W_W_Aspirin_count==0,] %>% colMeans()
+plot(ant_1, lty = 1,type = 'l',col = 'red')
+lines(ant_0, lty = 1,type = 'l',col = 'blue')
+
+
+
+#Event bleeding
+mbdate <- as.Date(Blanca$mbdate, "%Y-%m-%d")
+event_time <- mbdate-data_out$af_start
+data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+data_out$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
+df <- data_out[complete.cases(data_out),]
+
+case_blanca_bleed <- case_estimate(df)
+
+
+#Event death
+dod <- as.Date(Blanca$dod, "%Y-%m-%d")
+event_time <- dod-data_out$af_start
+data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+data_out$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
+df <- data_out[complete.cases(data_out),]
+
+case_blanca_death <- case_estimate(df)
+
+
+
+
+table(data_out$T.tilde)
+hist(data_out$T.tilde)
+table(data_out$Delta[data_out$T.tilde<100])/nrow(data_out)
+table(data_out$A)/nrow(data_out)
+
+#data_out <- data_out[idx,]
+
+
+
+
+
 
 
 
