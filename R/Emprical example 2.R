@@ -61,7 +61,7 @@ data_out$af_end <-  as.Date(Blanca$af_end, "%Y-%m-%d")
 follow_up <- data_out$af_end-data_out$af_start
 
 
-case_estimate <- function(df){
+case_estimate <- function(df,adjustVars){
   require(dplyr)
   df$T.tilde <- round(df$T.tilde/180)
   df <- df[df$T.tilde<=200 & df$T.tilde>0,]
@@ -175,19 +175,9 @@ case_estimate_avg <- function(df,sl_fit){
 
 
 
-#Event stroke rivaroxaban
-issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
-event_time <- issedate-data_out$af_start
-data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
-data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
-
-data_out$A <- ifelse( is.na(Blanca$rivaroxaban),0,1)
-data_out$A <- ifelse( is.na(Blanca$dabigatran),0,1)
-data_out$A <- ifelse( is.na(Blanca$apixaban),0,1)
-data_out$A <- ifelse( is.na(Blanca$edoxaban),0,1)
 
 
-df <- data_out[complete.cases(data_out),]
+
 
 #Event combine
 combodate <- as.Date(Blanca$combodate, "%Y-%m-%d")
@@ -209,50 +199,107 @@ data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
 data_out$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
 df <- data_out[complete.cases(data_out),]
 
-case_blanca_issedate <- case_estimate(sample_n(df,10000))
+case_blanca_issedate <- case_estimate(df)
 
 
-ITE <- case_blanca_issedate$sl_fit_1$survival-case_blanca_issedate$sl_fit_0$survival
-a <- ITE[case_blanca_issedate$df$W_W_chadvasc_index_2y>=1/9&case_blanca_issedate$df$W_W_female==0,] %>% colMeans()
-b <- ITE[case_blanca_issedate$df$W_W_chadvasc_index_2y>=2/9&case_blanca_issedate$df$W_W_female==1,] %>% colMeans()
+#Event stroke by age subgroups
+'%notin%' <- function(x,y)!('%in%'(x,y))
+issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
+event_time <- issedate-data_out$af_start
+data_out_sg <- data_out[,names(data_out)%notin%c('W_age')]
+adjustVars2 <- adjustVars[,names(adjustVars)%notin%c('W_age')]
+data_out_sg$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out_sg$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+data_out_sg$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
+df_age1 <- data_out_sg[complete.cases(data_out_sg)&Blanca$age>=65,]
+df_age2 <- data_out_sg[complete.cases(data_out_sg)&Blanca$age< 65,]
 
-eic <- case_blanca_issedate$eic_1-case_blanca_issedate$eic_0
-a1 <- apply(eic[case_blanca_issedate$df$W_W_chadvasc_index_2y>=1/9&case_blanca_issedate$df$W_W_female==0,],2,sd)/100
-b1 <- apply(eic[case_blanca_issedate$df$W_W_chadvasc_index_2y>=2/9&case_blanca_issedate$df$W_W_female==1,],2,sd)/100
-
-
-plot(b, lty = 1,type = 'l',col = 'red')
-lines(b-b1, lty = 2,type = 'l',col = 'red')
-lines(b+b1, lty = 2,type = 'l',col = 'red')
-lines(a, lty = 1,type = 'l',col = 'blue')
-lines(a-a1, lty = 2,type = 'l',col = 'blue')
-lines(a+a1, lty = 2,type = 'l',col = 'blue')
-
-
-age1 <- ITE[Blanca[rownames(case_blanca_issedate$df),'age']>=65,] %>% colMeans()
-age0 <- ITE[Blanca[rownames(case_blanca_issedate$df),'age']< 65,] %>% colMeans()
-
-plot(age1, lty = 1,type = 'l',col = 'red')
-lines(age0, lty = 1,type = 'l',col = 'blue')
+case_blanca_issedate_age1 <- case_estimate(df_age1,adjustVars)
+case_blanca_issedate_age2 <- case_estimate(df_age2,adjustVars)
 
 
-prevka_0 <- ITE[case_blanca_issedate$df$W_W_prev_vka==0,] %>% colMeans()
-prevka_1 <- ITE[case_blanca_issedate$df$W_W_prev_vka==1,] %>% colMeans()
 
+data_out_sg <- data_out[,names(data_out)%notin%c('W_age')]
+adjustVars2 <- adjustVars[,names(adjustVars)%notin%c('W_age')]
+data_out_sg$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out_sg$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+data_out_sg$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
+df <- data_out_sg[complete.cases(data_out_sg),]
+df_chadvasc1 <- df[Blanca$chadvasc_index_2y>=1 & Blanca$female ==0,]
+df_chadvasc2 <- df[Blanca$chadvasc_index_2y>=2 & Blanca$female ==1,]
+
+
+case_blanca_issedate_chadvasc1 <- case_estimate(df_chadvasc1,adjustVars)
+case_blanca_issedate_chadvasc2 <- case_estimate(df_chadvasc2,adjustVars)
+
+
+
+#Event stroke by prevka subgroups after
+prevka_0 <- ITE[case_blanca_issedate$df$W_prev_vka==0,] %>% colMeans()
+prevka_1 <- ITE[case_blanca_issedate$df$W_prev_vka==1,] %>% colMeans()
 plot(prevka_1, lty = 1,type = 'l',col = 'red')
 lines(prevka_0, lty = 1,type = 'l',col = 'blue')
 
 
-CAO_1 <- ITE[case_blanca_issedate$df$W_W_Coronary.artery.operations_count==1,] %>% colMeans()
-CAO_0 <- ITE[case_blanca_issedate$df$W_W_Coronary.artery.operations_count==0,] %>% colMeans()
-plot(CAO_1, lty = 1,type = 'l',col = 'red')
-lines(CAO_0, lty = 1,type = 'l',col = 'blue')
 
 
-ant_1 <- ITE[case_blanca_issedate$df$W_W_Prasugrel_count==1 | case_blanca_issedate$df$W_W_Aspirin_count>0,] %>% colMeans()
-ant_0 <- ITE[case_blanca_issedate$df$W_W_Prasugrel_count==0 | case_blanca_issedate$df$W_W_Aspirin_count==0,] %>% colMeans()
-plot(ant_1, lty = 1,type = 'l',col = 'red')
-lines(ant_0, lty = 1,type = 'l',col = 'blue')
+
+#Event stroke by subgroups
+'%notin%' <- function(x,y)!('%in%'(x,y))
+issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
+event_time <- issedate-data_out$af_start
+data_out_sg <- data_out[,names(data_out)%notin%c('W_Coronary.artery.operations_count')]
+adjustVars2 <- adjustVars[,names(adjustVars)%notin%c('W_Coronary.artery.operations_count')]
+data_out_sg$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out_sg$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+data_out_sg$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
+df_cao1 <- data_out_sg[complete.cases(data_out_sg)&Blanca$Coronary.artery.operations_count==1,]
+df_cao0 <- data_out_sg[complete.cases(data_out_sg)&Blanca$Coronary.artery.operations_count==0,]
+
+case_blanca_issedate_cao1 <- case_estimate(df_cao1,adjustVars2)
+case_blanca_issedate_cao0 <- case_estimate(df_cao0,adjustVars2)
+
+
+
+#CAO_1 <- ITE[case_blanca_issedate$df$W_Coronary.artery.operations_count==1,] %>% colMeans()
+#CAO_0 <- ITE[case_blanca_issedate$df$W_Coronary.artery.operations_count==0,] %>% colMeans()
+#plot(CAO_1, lty = 1,type = 'l',col = 'red')
+#lines(CAO_0, lty = 1,type = 'l',col = 'blue')
+
+
+#Event stroke by subgroups
+
+issedate <- as.Date(Blanca$issedate, "%Y-%m-%d")
+event_time <- issedate-data_out$af_start
+data_out_sg <- data_out[,names(data_out)%notin%c('W_Prasugrel_count','W_Aspirin_count')]
+adjustVars2 <- adjustVars[,names(adjustVars)%notin%c('W_Prasugrel_count','W_Aspirin_count')]
+data_out_sg$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
+data_out_sg$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
+data_out_sg$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
+df <- data_out_sg[complete.cases(data_out_sg),]
+df_ant1 <- df[Blanca$Prasugrel_count==1 | Blanca$Aspirin_count >0,]
+df_ant0 <- df[Blanca$Prasugrel_count==0 & Blanca$Aspirin_count ==0,]
+
+case_blanca_issedate_ant1 <- case_estimate(df_ant1,adjustVars2)
+case_blanca_issedate_ant0 <- case_estimate(df_ant0,adjustVars2)
+
+
+
+
+#ant_1 <- ITE[case_blanca_issedate$df$W_Prasugrel_count==1 | case_blanca_issedate$df$W_Aspirin_count>0,] %>% colMeans()
+#ant_0 <- ITE[case_blanca_issedate$df$W_Prasugrel_count==0 | case_blanca_issedate$df$W_Aspirin_count==0,] %>% colMeans()
+#plot(ant_1, lty = 1,type = 'l',col = 'red')
+#lines(ant_0, lty = 1,type = 'l',col = 'blue')
+
+
+rivaroxaban <- ifelse( is.na(Blanca$rivaroxaban),0,1)
+dabigatran <- ifelse( is.na(Blanca$dabigatran),0,1)
+apixaban <- ifelse( is.na(Blanca$apixaban),0,1)
+edoxaban <- ifelse( is.na(Blanca$edoxaban),0,1)
+rivaroxaban_ITE <- ITE[rivaroxaban[as.numeric(rownames(case_blanca_issedate$df))]==1 ,] %>% colMeans()
+dabigatran_ITE <- ITE[dabigatran[as.numeric(rownames(case_blanca_issedate$df))]==1 ,] %>% colMeans()
+apixaban_ITE <- ITE[apixaban[as.numeric(rownames(case_blanca_issedate$df))]==1 ,] %>% colMeans()
+edoxaban_ITE <- ITE[edoxaban[as.numeric(rownames(case_blanca_issedate$df))]==1 ,] %>% colMeans()
 
 
 
@@ -262,9 +309,11 @@ event_time <- mbdate-data_out$af_start
 data_out$T.tilde <- ifelse(is.na(event_time),follow_up,ifelse(event_time>follow_up,follow_up,event_time))
 data_out$Delta <- ifelse(is.na(event_time),0,ifelse(event_time>follow_up,0,1))
 data_out$A <- ifelse(Blanca$anticoagulant=="NOAC",1,0)
-df <- data_out[complete.cases(data_out),]
+df <- data_out[complete.cases(data_out) ,]
 
 case_blanca_bleed <- case_estimate(df)
+
+
 
 
 #Event death
@@ -294,55 +343,52 @@ table(data_out$A)/nrow(data_out)
 
 
 
-
-compose_result <- function(scenario, scenario_tmle, scenario_EIC,scenario_var = data_out){
-  if (exists('scenario')){
-    Estimation <- plyr::ldply(scenario, function(x) x)
-    SD <- plyr::ldply(scenario, function(x) x) %>% sapply(sd) %>% as.vector()
-    Estimation_average <-  plyr::ldply(scenario, function(x) colMeans(x))
-  }else{
-    message('No scenario found')
-  }
-  if (exists('scenario_tmle')){
-    TMLE_estimation <- plyr::ldply(scenario_tmle, function(x) x)
-    SD_t <- plyr::ldply(scenario_tmle, function(x) x) %>% sapply(sd) %>% as.vector()
-    Estimation_average_t <- plyr::ldply(scenario_tmle, function(x) colMeans(x))
-  }else{
-    message('No TMLE scenario found, set as initial fitting')
-    scenario_tmle <- scenario
-    TMLE_estimation <- plyr::ldply(scenario_tmle, function(x) x)
-    SD_t <- plyr::ldply(scenario_tmle, function(x) x) %>% sapply(sd) %>% as.vector()
-    Estimation_average_t <- plyr::ldply(scenario_tmle, function(x) colMeans(x))
-  }
-  if (exists('scenario_EIC')){
-    EIC_estimation <- plyr::ldply(scenario_EIC, function(x) x)
-  }else{
-    message('No EIC found')
-  }
+compose_result <- function(case = case_blanca_death){
+  Estimation <- case$sl_fit_1$survival - case$sl_fit_0$survival
+  SD <- Estimation %>% apply(2,sd) %>% as.vector()
+  Estimation_average <-  colMeans(Estimation)
   
+  TMLE_estimation <- case$moss_fit_1$density_failure$survival-case$moss_fit_0$density_failure$survival
+  SD_t <- TMLE_estimation %>%apply(2,sd) %>% as.vector()
+  Estimation_average_t <- colMeans(TMLE_estimation)
+  
+  EIC_estimation <- case$eic_1-case$eic_0
+
   
   return(list(
+    Estimation=Estimation,
     TMLE_estimation= TMLE_estimation,
     EIC_estimation=EIC_estimation,
-    Estimation=Estimation,
-    scenario_var = scenario_var[,grep("W",names(scenario_var),value = T)],
-    Summary=data.frame(time=1:length(colMeans(Estimation_average)),SD=SD,SD_t=SD_t,
-                       Mean = colMeans(Estimation_average) ,
-                       TMLE = colMeans(Estimation_average_t))
+    Summary=data.frame(Time=1:ncol(Estimation), SD=SD,SD_t=SD_t,
+                       Mean = Estimation_average ,
+                       TMLE = Estimation_average_t
+    )
   ))
 }
-Estimation <- ITE
-TMLE_estimation <- ITE
-EIC <- eic_fit_1-eic_fit_0
-
-scenario_p <- compose_result(list(Estimation),list(TMLE_estimation),list(EIC),data_out)
-raw_scenario <- data.frame(group = "Initial",scenario_p$Estimation)
-tmle_scenario <- data.frame(group = "TMLE",scenario_p$TMLE_estimation)
 
 
-plot(scenario_p$Summary$SD,type='l',lty=4)
-lines(scenario_p$Summary$SD_t,type='l')
+issedate_chadvasc1 <- compose_result(case_blanca_issedate_chadvasc1)
+issedate_chadvasc2 <- compose_result(case_blanca_issedate_chadvasc2)
+issedate_age1 <- compose_result(case_blanca_issedate_age1)
+issedate_age2 <- compose_result(case_blanca_issedate_age2)
+issedate_cao1 <- compose_result(case_blanca_issedate_cao1)
+issedate_cao0 <- compose_result(case_blanca_issedate_cao0)
+issedate_ant1 <- compose_result(case_blanca_issedate_ant1)
+issedate_ant0 <- compose_result(case_blanca_issedate_ant0)
 
+issedate <- compose_result(case_blanca_issedate)
+comb <- compose_result(case_blanca_comb)
+bleed <- compose_result(case_blanca_bleed)
+death <- compose_result(case_blanca_death)
+
+
+
+diagnose.data <- rbind(issedate_chadvasc1$Summary,issedate_chadvasc2$Summary,
+                       issedate_age1$Summary,issedate_age2$Summary,
+                       issedate_cao1$Summary,issedate_cao0$Summary,
+                       issedate_ant1$Summary,issedate_ant0$Summary,
+                       issedate$Summary,comb$Summary,
+                       bleed$Summary,death$Summary)
 
 
 
