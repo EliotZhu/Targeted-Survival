@@ -389,6 +389,7 @@ diagnose.data <- rbind(issedate_chadvasc1$Summary,issedate_chadvasc2$Summary,
                        issedate_ant1$Summary,issedate_ant0$Summary,
                        issedate$Summary,comb$Summary,
                        bleed$Summary,death$Summary)
+write.csv(diagnose.data, file = paste0(getwd(),'/Result/diagnose.data.csv') , row.names = FALSE)
 
 
 
