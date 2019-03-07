@@ -7,10 +7,23 @@ library(here,usethis)
 
 case_simu <- function(p,ratDiv){
   n_sim = 1000
-  simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=ratDiv,confoundlevel = 1,p=p)
+  simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=ratDiv,confoundlevel = 2,p=p)
   df <- simulated$dat
   df <- df[complete.cases(df),]
   table(df$Delta)/nrow(df)
+  
+  # create function for fitting propensity score model
+  prop.func <- function(x, trt)
+  {
+    # fit propensity score model
+    propens.model <- SuperLearner(Y = trt, X = x, SL.library = c("SL.mean", "SL.glm", "SL.glmnet"),
+                                  family = "binomial")
+    pi.x <- predict(propens.model, type = "response")
+    pi.x$pred
+  }
+  check.overlap(x = data.frame(df[, simulated$wnames]),
+                trt = df$A,
+                propensity.func = prop.func)
   
   # hist(df$W1[df$A==1],col=rgb(0,0,1,0.5))
   # hist(df$W1[df$A==0],col=rgb(1,0,0,0.5),add = T)
@@ -252,6 +265,12 @@ diagnose.data <- rbind(scenario1$Summary,scenario2$Summary,scenario3$Summary,sce
 diagnose.data.out.2 <-diagnose.data[diagnose.data$Time=="2",]
 diagnose.data.out.9 <-diagnose.data[diagnose.data$Time=="9",]
 diagnose.data.out.18 <-diagnose.data[diagnose.data$Time=="18",]
+
+
+
+
+
+
 
 
 write.csv(diagnose.data, file = paste0(getwd(),'/Result/diagnose.data.csv') , row.names = FALSE)

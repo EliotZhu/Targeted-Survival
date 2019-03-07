@@ -12,15 +12,15 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
 
   D <- DAG.empty()
   D <- D +
-    node("W1", distr ="runif", min = 0, max = 1)+
-    node("W2", distr ="runif", min = 0, max = 1.5)+
+    node("W1", distr ="runif", min = 0, max = 2)+
+    node("W2", distr ="runif", min = 0, max = 2)+
     node("W3", distr ="rbinom", prob = .5,size=1)+
     node("W4", distr ="rbinom", prob = .5,size=1)
   if(conmode == "scenario 3"){
     for (i in 5:20){
       D <- D +eval(parse(text= paste0("node('W",i,"', distr ='rbinom', prob = .1,size=1)")))
     }
-    D <- D+ node("odds",distr = "rconst", const = confoundlevel*(W1+W2+W3+W4)/4)+
+    D <- D+ node("odds",distr = "rconst", const = exp(0.25 + confoundlevel*(W1 - W2 + W3 - W4)))+
         #node("A", distr = "rbinom", size = 1, prob = ifelse(W1==1,1,0)) +
         node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
         node("rate",distr = "rconst", const = ((mypoly(W1)+W2+mypoly(W3)+W4)*A+
