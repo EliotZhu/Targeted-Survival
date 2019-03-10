@@ -1,29 +1,21 @@
 library(dplyr,abind)
 library(tidyverse)
-library(survival,simsurv)
-library(survminer)
-library(simcausal)
 library(here,usethis)
 
-case_simu <- function(p,ratDiv){
-  n_sim = 1000
-  simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=ratDiv,confoundlevel = 2,p=p)
+case_simu <- function(ratDiv,confoundlevel){
+  require(MOSS)
+  require(survival)
+  require(simcausal)
+
+  
+  n_sim = 2000
+  simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario s",ratDiv=ratDiv,confoundlevel = confoundlevel)
   df <- simulated$dat
   df <- df[complete.cases(df),]
-  table(df$Delta)/nrow(df)
+  cat(table(df$Delta)/nrow(df))
   
   # create function for fitting propensity score model
-  prop.func <- function(x, trt)
-  {
-    # fit propensity score model
-    propens.model <- SuperLearner(Y = trt, X = x, SL.library = c("SL.mean", "SL.glm", "SL.glmnet"),
-                                  family = "binomial")
-    pi.x <- predict(propens.model, type = "response")
-    pi.x$pred
-  }
-  check.overlap(x = data.frame(df[, simulated$wnames]),
-                trt = df$A,
-                propensity.func = prop.func)
+
   
   # hist(df$W1[df$A==1],col=rgb(0,0,1,0.5))
   # hist(df$W1[df$A==0],col=rgb(1,0,0,0.5),add = T)
@@ -32,16 +24,14 @@ case_simu <- function(p,ratDiv){
   
   
   adjustVars <- simulated$wnames
-  sl_lib_g <- c("SL.mean", "SL.glm", "SL.gam")
-  sl_lib_censor <- c("SL.mean", "SL.glm", "SL.gam")
-  sl_lib_failure <- c("SL.mean", "SL.glm", "SL.gam")
+  sl_lib_g <- c("SL.mean", "SL.glm", "SL.earth")
+  sl_lib_censor <- c("SL.mean", "SL.glm", "SL.earth")
+  sl_lib_failure <- c("SL.mean", "SL.glm", "SL.earth")
   
   
   #df$T.tilde <- df$T.tilde + 1
   k_grid <- 1:max(df$T.tilde)
-  k_grid
-  
-  library(MOSS)
+
   #SL
   sl_fit <- initial_sl_fit(
     ftime = df$T.tilde,
@@ -84,9 +74,8 @@ case_simu <- function(p,ratDiv){
     max_num_interation = 1e2,
     verbose = F
   )
-
-  eic_1 <- moss_fit$eic_out
   moss_fit1 <- moss_fit
+  
   
   moss_fit <- MOSS$new(
     A = df$A,
@@ -104,10 +93,8 @@ case_simu <- function(p,ratDiv){
     max_num_interation = 1e2,
     verbose = F
   )
-  eic_0 <- moss_fit$eic_out
   moss_fit0 <- moss_fit
-  
-  
+
   #moss_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_1)
   #moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
   
@@ -145,8 +132,7 @@ case_simu <- function(p,ratDiv){
     g1W = sl_fit$g1W,
     k_grid = k_grid
   )
-  psi_moss_hazard_ate_1 <- moss_hazard_ate_fit$iterate_onestep(epsilon = 1e-1 / n_sim, 
-                                                               max_num_interation = 2e1, verbose = T)
+  psi_moss_hazard_ate_1 <- moss_hazard_ate_fit$iterate_onestep(epsilon = 1e-1 / n_sim, max_num_interation = 2e1, verbose = T)
   moss_hazard_ate_fit_1 <- survival_curve$new(t = k_grid, survival = psi_moss_hazard_ate_1)
   
   
@@ -166,37 +152,54 @@ case_simu <- function(p,ratDiv){
               sl_fit_0 = sl_fit$density_failure_0,
               true.1 = true.1,
               true.0 = true.0,
-              eic_1 = eic_1,
-              eic_0 = eic_0,
               TMLE_diff = TMLE_diff,
               SL_diff = sl_fit$density_failure_1$survival-sl_fit$density_failure_0$survival,
               true_diff = true.1-true.0,
-              eic_diff = moss_hazard_ate_fit$eic_out
+              eic_diff = moss_hazard_ate_fit$eic_fit,
+              df = df,
+              adjustVars = adjustVars
   )
-  
   return(out)
 }  
+prop.func <- function(x, trt)
+{
+  # fit propensity score model
+  propens.model <- SuperLearner(Y = trt, X = x, SL.library = c("SL.mean", "SL.glm", "SL.glmnet"),
+                                family = "binomial")
+  pi.x <- predict(propens.model, type = "response")
+  pi.x$pred
+}
+
+case <- case1
+check.overlap(x = data.frame(case$df[, case1$adjustVars]),
+              trt = case$df$A,
+              propensity.func = prop.func)
+
+case1 <- case_simu(220,0.5)
+case2 <- case_simu(220,log(2))
+case3 <- case_simu(220,log(3))
+case4 <- case_simu(220,log(4))
+
+case1.1 <- case_simu(220,0)
+case2.1 <- case_simu(220,log(2))
+case3.1 <- case_simu(220,log(3))
+case4.1 <- case_simu(220,log(4))
 
 
-case1 <- case_simu(1,140)
-case2 <- case_simu(5,300)
-case3 <- case_simu(15,600)
-case4 <- case_simu(30,800)
+case1.1 <- case_simu(750,0)
+case2.1 <- case_simu(750,1)
+case3.1 <- case_simu(750,2)
+case4.1 <- case_simu(750,3)
 
-case1.1 <- case_simu(1,490)
-case2.1 <- case_simu(5,1100)
-case3.1 <- case_simu(15,2000)
-case4.1 <- case_simu(30,3300)
+case1.2 <- case_simu(2000,0)
+case2.2 <- case_simu(2000,1)
+case3.2 <- case_simu(2000,2)
+case4.2 <- case_simu(2000,3)
 
-case1.2 <- case_simu(1,1300)
-case2.2 <- case_simu(5,3100)
-case3.2 <- case_simu(15,6100)
-case4.2 <- case_simu(30,7000)
-
-case1.3 <- case_simu(1,11000)
-case2.3 <- case_simu(5,40000)
-case3.3 <- case_simu(15,64000)
-case4.3 <- case_simu(30,105000)
+case1.3 <- case_simu(22000,0)
+case2.3 <- case_simu(22000,1)
+case3.3 <- case_simu(22000,2)
+case4.3 <- case_simu(22000,3)
 
 
 
@@ -211,14 +214,14 @@ compose_result <- function(case){
 
     EIC_estimation <- case$eic_diff
     True.eff <- case$true.1-case$true.0
-    True_average <- colMeans(True.eff)
+    True_average <- colMeans(True.eff, na.rm = T)
     
     Bias <- Estimation-True.eff
-    RMSE <- colMeans(Bias^2) %>% sqrt()
+    RMSE <- colMeans(Bias^2, na.rm = T) %>% sqrt()
     NRMSE <- RMSE/abs(Estimation_average)
     
     Bias_t <- TMLE_estimation-True.eff
-    RMSE_t <- colMeans(Bias_t^2) %>% sqrt()
+    RMSE_t <- colMeans(Bias_t^2, na.rm = T) %>% sqrt()
     NRMSE_t <- RMSE_t/abs((Estimation_average_t))
     
 
@@ -238,10 +241,10 @@ compose_result <- function(case){
       )
     ))
 }
-scenario1 <- compose_result(case1)
-scenario2 <- compose_result(case2)
-scenario3 <- compose_result(case3)
-scenario4 <- compose_result(case4)
+scenario1 <- compose_result(case1)$Summary 
+scenario2 <- compose_result(case2)$Summary 
+scenario3 <- compose_result(case3)$Summary 
+scenario4 <- compose_result(case4)$Summary 
 
 scenario1.1 <- compose_result(case1.1)
 scenario2.1 <- compose_result(case2.1)

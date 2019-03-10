@@ -1,13 +1,13 @@
 #' get the simulation scenario
 #' @export
 get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,confoundlevel=4,p=1){
-  mypoly <- function(x){
-    out <- data.frame("X1"=x)
-    for (i in 1:p){
-      eval(parse(text= paste0("out$X",i," <- x^i")))
-    }
-    return(apply(out,1,sum))
-  }
+  # mypoly <- function(x){
+  #   out <- data.frame("X1"=x)
+  #   for (i in 1:p){
+  #     eval(parse(text= paste0("out$X",i," <- x^i")))
+  #   }
+  #   return(apply(out,1,sum))
+  # }
 
 
   D <- DAG.empty()
@@ -23,8 +23,8 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
     D <- D+ node("odds",distr = "rconst", const = exp(0.25 + confoundlevel*(W1 - W2 + W3 - W4)))+
         #node("A", distr = "rbinom", size = 1, prob = ifelse(W1==1,1,0)) +
         node("A", distr = "rbinom", size = 1, prob = odds / (1 + odds)) +
-        node("rate",distr = "rconst", const = ((mypoly(W1)+W2+mypoly(W3)+W4)*A+
-                                                mypoly(W1)+W2+mypoly(W3)+W4)/ratDiv)+
+        node("rate",distr = "rconst", const = ((W1+W2+W3+W4)*A+
+                                                W1+W2+W3+W4)/ratDiv)+
         node("Cweib", distr = "rweibull", shape = 1+W5/5, scale = 50)+
         node("Trexp", distr = "rexp", rate = rate) +
         node("T", distr = "rconst", const = round(Trexp/11)) +
@@ -32,12 +32,12 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
     wnames <- grep('W',names(D),value = T)
     true_surv <- function(x,tgrid,A){
       x <- as.matrix(x,nrow=1)
-      rate <- as.numeric((mypoly(x[1])+cos(x[2])+mypoly(x[3])+x[4])*A+mypoly(x[1])+cos(x[2])+mypoly(x[3])+x[4])
+      rate <- as.numeric(((x[1])+(x[2])+(x[3])+x[4])*A+(x[1])+(x[2])+(x[3])+x[4])
       s_diff_true <-    1 - pexp(seq(0,tgrid,1)*11, rate = rate/ratDiv)
       return(s_diff_true)
     }
-  }else if(conmode == "scenario s"){
-    D <- D+node("A", distr = "rbinom", size = 1, prob = .15 + .5 * as.numeric(W2 > .75)) +
+  } else if(conmode == "scenario s"){
+    D <- D+node("A", distr = "rbinom", size = 1, prob = .15 + confoundlevel * as.numeric(W2 > .75)) +
       node("rate",distr = "rconst", const = 1 + .7 * W2^2 - .8 * A)+
       node("Cweib", distr = "rweibull", shape = 1 + .5 * W2, scale = 75)+
       node("Trexp", distr = "rexp", rate = rate) +
