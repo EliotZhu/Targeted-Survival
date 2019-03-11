@@ -2,14 +2,12 @@ library(dplyr,abind)
 library(tidyverse)
 library(here,usethis)
 
-case_simu <- function(ratDiv,confoundlevel){
+case_simu <- function(n_sim,ratDiv,confoundlevel){
   require(MOSS)
   require(survival)
   require(simcausal)
 
-  
-  n_sim = 2000
-  simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario s",ratDiv=ratDiv,confoundlevel = confoundlevel)
+  simulated <- get.data(iti=1234,samplesize=n_sim, conmode ="scenario 3",ratDiv=ratDiv,confoundlevel = 1)
   df <- simulated$dat
   df <- df[complete.cases(df),]
   cat(table(df$Delta)/nrow(df))
@@ -24,9 +22,9 @@ case_simu <- function(ratDiv,confoundlevel){
   
   
   adjustVars <- simulated$wnames
-  sl_lib_g <- c("SL.mean", "SL.glm", "SL.earth")
-  sl_lib_censor <- c("SL.mean", "SL.glm", "SL.earth")
-  sl_lib_failure <- c("SL.mean", "SL.glm", "SL.earth")
+  sl_lib_g <- c("SL.mean", "SL.glm", "SL.gam")
+  sl_lib_censor <- c("SL.mean", "SL.glm", "SL.gam")
+  sl_lib_failure <- c("SL.mean", "SL.glm", "SL.gam")
   
   
   #df$T.tilde <- df$T.tilde + 1
@@ -54,6 +52,16 @@ case_simu <- function(ratDiv,confoundlevel){
   sl_density_failure_0_marginal <- sl_fit$density_failure_0$clone(deep = TRUE)
   sl_density_failure_1_marginal$survival <- matrix(colMeans(sl_density_failure_1_marginal$survival), nrow = 1)
   sl_density_failure_0_marginal$survival <- matrix(colMeans(sl_density_failure_0_marginal$survival), nrow = 1)
+  
+  
+  controls <- simulated$dat2[,grep("W",names( simulated$dat2),value = T)]
+  true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,max(k_grid),A=1)))[,1:max(k_grid)]
+  true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,max(k_grid),A=0)))[,1:max(k_grid)]
+  
+  plot(true.1 %>% colMeans(),type = 'l')
+  lines(  sl_density_failure_1_marginal$survival %>% t(),type = 'l',lty=2)
+  plot(true.0 %>% colMeans(),type = 'l')
+  lines(  sl_density_failure_0_marginal$survival %>% t(),type = 'l',lty=2)
   
   
   
@@ -99,9 +107,7 @@ case_simu <- function(ratDiv,confoundlevel){
   #moss_fit_0 <- survival_curve$new(t = k_grid, survival = psi_moss_0)
   
   
-  controls <- simulated$dat2[,grep("W",names( simulated$dat2),value = T)]
-  true.1 <- t(apply(controls, 1, function(x) simulated$true_surv(x,max(k_grid),A=1)))[,1:max(k_grid)]
-  true.0 <- t(apply(controls, 1, function(x) simulated$true_surv(x,max(k_grid),A=0)))[,1:max(k_grid)]
+
   
   
   # #%Bias for treatment curve 
@@ -145,7 +151,6 @@ case_simu <- function(ratDiv,confoundlevel){
   # plot(abs(c$MOSS),type = 'l',lty=2,col='green')
   # lines(abs(c$SL),type = 'l',lty=3)
   
-  
   out <- list(moss_fit_1 = moss_fit1,
               moss_fit_0 = moss_fit0,
               sl_fit_1 = sl_fit$density_failure_1,
@@ -175,26 +180,20 @@ check.overlap(x = data.frame(case$df[, case1$adjustVars]),
               trt = case$df$A,
               propensity.func = prop.func)
 
-case1 <- case_simu(220,0.5)
-case2 <- case_simu(220,log(2))
-case3 <- case_simu(220,log(3))
-case4 <- case_simu(220,log(4))
+case1 <- case_simu(2000,220,0)
+case2 <- case_simu(2000,220,0.5)
+case3 <- case_simu(2000,220,1)
 
-case1.1 <- case_simu(220,0)
-case2.1 <- case_simu(220,log(2))
-case3.1 <- case_simu(220,log(3))
-case4.1 <- case_simu(220,log(4))
+case1.1 <- case_simu(2000,500,0)
+case2.1 <- case_simu(2000,500,0.5)
+case3.1 <- case_simu(2000,500,1)
+compose_result(case1.1)$Summary
+compose_result(case2.1)$Summary
+compose_result(case3.1)$Summary
 
-
-case1.1 <- case_simu(750,0)
-case2.1 <- case_simu(750,1)
-case3.1 <- case_simu(750,2)
-case4.1 <- case_simu(750,3)
-
-case1.2 <- case_simu(2000,0)
-case2.2 <- case_simu(2000,1)
-case3.2 <- case_simu(2000,2)
-case4.2 <- case_simu(2000,3)
+case1.2 <- case_simu(2000,2000,0)
+case2.2 <- case_simu(2000,2000,0.5)
+case3.2 <- case_simu(2000,2000,1)
 
 case1.3 <- case_simu(22000,0)
 case2.3 <- case_simu(22000,1)
@@ -241,20 +240,17 @@ compose_result <- function(case){
       )
     ))
 }
-scenario1 <- compose_result(case1)$Summary 
-scenario2 <- compose_result(case2)$Summary 
-scenario3 <- compose_result(case3)$Summary 
-scenario4 <- compose_result(case4)$Summary 
+scenario1 <- compose_result(case1) 
+scenario2 <- compose_result(case2) 
+scenario3 <- compose_result(case3) 
 
 scenario1.1 <- compose_result(case1.1)
 scenario2.1 <- compose_result(case2.1)
 scenario3.1 <- compose_result(case3.1)
-scenario4.1 <- compose_result(case4.1)
 
 scenario1.2 <- compose_result(case1.2)
 scenario2.2 <- compose_result(case2.2)
 scenario3.2 <- compose_result(case3.2)
-scenario4.2 <- compose_result(case4.2)
 
 scenario1.3 <- compose_result(case1.3)
 scenario2.3 <- compose_result(case2.3)

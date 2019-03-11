@@ -12,12 +12,12 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
 
   D <- DAG.empty()
   D <- D +
-    node("W1", distr ="runif", min = 0, max = 2)+
-    node("W2", distr ="runif", min = 0, max = 2)+
+    node("W1", distr ="runif", min = 0, max = 1)+
+    node("W2", distr ="runif", min = 0, max = 1.5)+
     node("W3", distr ="rbinom", prob = .5,size=1)+
     node("W4", distr ="rbinom", prob = .5,size=1)
   if(conmode == "scenario 3"){
-    for (i in 5:20){
+    for (i in 5:10){
       D <- D +eval(parse(text= paste0("node('W",i,"', distr ='rbinom', prob = .1,size=1)")))
     }
     D <- D+ node("odds",distr = "rconst", const = exp(0.25 + confoundlevel*(W1 - W2 + W3 - W4)))+
@@ -27,13 +27,13 @@ get.data <- function(iti=1234,samplesize=1000, conmode="scenario 3",ratDiv=1,con
                                                 W1+W2+W3+W4)/ratDiv)+
         node("Cweib", distr = "rweibull", shape = 1+W5/5, scale = 50)+
         node("Trexp", distr = "rexp", rate = rate) +
-        node("T", distr = "rconst", const = round(Trexp/11)) +
-        node("C", distr = "rconst", const = round(Cweib/11)) 
+        node("T", distr = "rconst", const = round(Trexp/15)) +
+        node("C", distr = "rconst", const = round(Cweib/15)) 
     wnames <- grep('W',names(D),value = T)
     true_surv <- function(x,tgrid,A){
       x <- as.matrix(x,nrow=1)
       rate <- as.numeric(((x[1])+(x[2])+(x[3])+x[4])*A+(x[1])+(x[2])+(x[3])+x[4])
-      s_diff_true <-    1 - pexp(seq(0,tgrid,1)*11, rate = rate/ratDiv)
+      s_diff_true <-    1 - pexp(seq(0,tgrid,1)*15, rate = rate/ratDiv)
       return(s_diff_true)
     }
   } else if(conmode == "scenario s"){
