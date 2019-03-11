@@ -394,15 +394,17 @@ write.csv(diagnose.data, file = paste0(getwd(),'/Result/diagnose.data.csv') , ro
 
 
 #---------------------Plot Large Violin---------------------
-violin.data <-raw_scenario
-names(violin.data) <- gsub("X","Time:",names(violin.data))
+violin.data <- issedate_age1$TMLE_estimation %>% as.data.frame()
+names(violin.data) <- gsub("V","Time:",names(violin.data))
+violin.data$group <- row.names(violin.data)
 violin.data <- reshape2::melt(violin.data, id.vars=c("group"), value.name = "value")
-violin.data$type <- "SL"
+violin.data$type <- "AGE1"
 
-violin.tmle <- tmle_scenario
-names(violin.tmle) <- gsub("X","Time:",names(violin.tmle))
+violin.tmle <- issedate_age2$TMLE_estimation %>% as.data.frame()
+names(violin.tmle) <- gsub("V","Time:",names(violin.tmle))
+violin.tmle$group <- row.names(violin.tmle)
 violin.tmle <- reshape2::melt(violin.tmle, id.vars=c("group"), value.name = "value")
-violin.tmle$type <- "MOSS"
+violin.tmle$type <- "AGE2"
 names(violin.tmle) <- names(violin.data)
 
 violin.data <- rbind(violin.tmle,violin.data)
@@ -416,12 +418,12 @@ vl.avg <- aggregate(violin.data$value, by=list(group = violin.data$group,variabl
 vl.avg$value <- vl.avg$x
 vl.avg <- vl.avg[vl.avg$variable=="Time:12"|vl.avg$variable=="Time:2"|vl.avg$variable=="Time:6",]
 
-g = ggplot(data=violin.data.1,aes(x=group,y=value)) + labs(x = "",y = "Treatment Effect")+theme_hc()+ ylim(c(0,0.04))+
-  geom_violin(data=subset(violin.data.1,type == 'MOSS'),aes(fill = "#F9BA32"),  alpha = 0.4,color=NA,lwd=.1,scale="width")+
-  geom_violin(data=subset(violin.data.1,type == 'SL'),aes(fill = "#426E86"), alpha = 0.4, color=NA,lwd=.1,scale="width")+
-  geom_point(data = subset(vl.avg,type == 'MOSS'),  alpha = .8, size = 2,color="#F9BA32",shape=3,stroke = 1)+
-  geom_point(data = subset(vl.avg,type == 'SL'), alpha = .8, size = 2, color="#426E86",shape=3,stroke = 1)+
-  scale_fill_manual("",values= c(alpha(c("#426E86","#F9BA32"),.4)),labels = c("ITE(SL)","ITE(TMLE)"))+
+g = ggplot(data=violin.data.1,aes(x=group,y=value)) + labs(x = "",y = "Treatment Effect")+theme_hc()+ 
+  geom_violin(data=subset(violin.data.1,type == 'AGE1'),aes(fill = "#F9BA32"),  alpha = 0.4,color=NA,lwd=.1,scale="width")+
+  geom_violin(data=subset(violin.data.1,type == 'AGE2'),aes(fill = "#426E86"), alpha = 0.4, color=NA,lwd=.1,scale="width")+
+  geom_point(data = subset(vl.avg,type == 'AGE1'),  alpha = .8, size = 2,color="#F9BA32",shape=3,stroke = 1)+
+  geom_point(data = subset(vl.avg,type == 'AGE2'), alpha = .8, size = 2, color="#426E86",shape=3,stroke = 1)+
+  scale_fill_manual("",values= c(alpha(c("#426E86","#F9BA32"),.4)),labels = c("ITE(AGE2)","ITE(AGE1)"))+
   facet_wrap(~variable,ncol=1,strip.position = "bottom")+coord_flip()+
   theme(legend.spacing.y = unit(0, "mm"),
         panel.border = element_rect(colour = "white", fill=NA),
