@@ -7,7 +7,7 @@ state and is being actively
 developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
 [![MIT
 license](http://img.shields.io/badge/license-MIT-brightgreen.svg)](http://opensource.org/licenses/MIT)
-[![DOI]](https://doi.org/10.1016/j.jbi.2020.103474)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4013120.svg)](https://doi.org/10.1016/j.jbi.2020.103474)
 
 ## Introduction
 
