@@ -1,0 +1,12 @@
+Package: slsurv
+Title: surperlearner estimator for survival
+Version: 0.1
+Authors@R: person("Jie", "Zhu", email = "first.last@example.com",
+                  role = c("aut", "cre"))
+Description: surperlearner estimator for survival
+Depends: R (>= 3.6.0)
+License: MIT
+LazyData: true
+Author: Jie Zhu [aut, cre]
+Maintainer: Jie Zhu <first.last@example.com>
+Built: R 3.6.3; ; 2020-05-14 11:00:52 UTC; unix
