@@ -1,4 +1,5 @@
-#Customised function
+#R function for python
+
 
 case_simu <- function(df, n_sim = 500, max_time = 30){
   require(dplyr)
@@ -13,7 +14,7 @@ case_simu <- function(df, n_sim = 500, max_time = 30){
 
 
   adjustVars <- grep('w', colnames(df), value = T)
-  sl_lib_g <- c( "SL.earth","SL.gam") #choose your own esemble algorithm here 
+  sl_lib_g <- c( "SL.earth","SL.gam") #choose your own esemble algorithm here
   sl_lib_censor <- c( "SL.earth","SL.gam")
   sl_lib_failure <- c( "SL.earth","SL.gam")
 
