@@ -1,4 +1,4 @@
-##Targeted estimation of heterogeneous treatment effect in observational survival analysis
+## Targeted estimation of heterogeneous treatment effect in observational survival analysis
 <br>
 **Author:** [Elliott J Zhu](https://scholar.google.com/citations?user=Cw5v2f4AAAAJ&hl=en)
 
@@ -11,8 +11,8 @@ license](http://img.shields.io/badge/license-MIT-brightgreen.svg)](http://openso
 
 ## Introduction
 
--This paper proposed a three-stage modular design for estimating the treatment effect heterogeneity in observational survival analysis.
--The method provides monotonic survival curves with adjustment for selection and censoring bias.
--We automate the identification of features contributing to the effect heterogeneity.
--We avoid the ad-hoc subgroup selection by non-parametrically estimating the conditional treatment effect.
--We provide evidence that oral anticoagulants confer protection against stroke and death on newly diagnosed non-valvular atrial fibrillation patients.
+This paper proposed a three-stage modular design for estimating the treatment effect heterogeneity in observational survival analysis.
+The method provides monotonic survival curves with adjustment for selection and censoring bias.
+We automate the identification of features contributing to the effect heterogeneity.
+We avoid the ad-hoc subgroup selection by non-parametrically estimating the conditional treatment effect.
+We provide evidence that oral anticoagulants confer protection against stroke and death on newly diagnosed non-valvular atrial fibrillation patients.
