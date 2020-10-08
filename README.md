@@ -1,12 +1,7 @@
----
-title: Targeted estimation of heterogeneous treatment effect in observational survival
+
+**title: Targeted estimation of heterogeneous treatment effect in observational survival
   analysis
-output:
-  html_document:
-    df_print: paged
-  md_document:
-    variant: markdown_github
----
+
 [![Project Status: Active – The project has reached a stable, usable
 state and is being actively
 developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
