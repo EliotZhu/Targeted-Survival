@@ -86,47 +86,11 @@ Run the method proposed in the step 1 and 2 of paper
   sl_fit$density_failure_1$hazard_to_survival()
 ```
 
-    ## <survival_curve>
-    ##   Public:
-    ##     ci: function (A, T_tilde, Delta, density_failure, density_censor, 
-    ##     clone: function (deep = FALSE) 
-    ##     create_ggplot_df: function (W = NULL) 
-    ##     display: function (type, W = NULL) 
-    ##     hazard: 0.04827380765544 0.0226732534117789 0.0264632731766024 0 ...
-    ##     hazard_to_pdf: function () 
-    ##     hazard_to_survival: function () 
-    ##     initialize: function (t, hazard = NULL, survival = NULL, pdf = NULL) 
-    ##     n: function () 
-    ##     pdf: NULL
-    ##     pdf_to_hazard: function () 
-    ##     pdf_to_survival: function () 
-    ##     survival: 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1  ...
-    ##     survival_to_hazard: function () 
-    ##     survival_to_pdf: function () 
-    ##     t: 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 ...
 
 ``` r
   sl_fit$density_failure_0$hazard_to_survival()
 ```
 
-    ## <survival_curve>
-    ##   Public:
-    ##     ci: function (A, T_tilde, Delta, density_failure, density_censor, 
-    ##     clone: function (deep = FALSE) 
-    ##     create_ggplot_df: function (W = NULL) 
-    ##     display: function (type, W = NULL) 
-    ##     hazard: 0.0450044757864713 0.0210992755922479 0.0246328234202494 ...
-    ##     hazard_to_pdf: function () 
-    ##     hazard_to_survival: function () 
-    ##     initialize: function (t, hazard = NULL, survival = NULL, pdf = NULL) 
-    ##     n: function () 
-    ##     pdf: NULL
-    ##     pdf_to_hazard: function () 
-    ##     pdf_to_survival: function () 
-    ##     survival: 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1  ...
-    ##     survival_to_hazard: function () 
-    ##     survival_to_pdf: function () 
-    ##     t: 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 ...
 
 ``` r
   sl_fit$density_failure_1$t <- k_grid
