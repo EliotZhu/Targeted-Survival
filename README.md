@@ -1,14 +1,15 @@
 
-# Targeted estimation of heterogeneous treatment effect in observational survival
-  analysis
+# Targeted estimation of heterogeneous treatment effect in observational survival analysis
 
->>>>>>> 61d5085a1ec749d7d9cd275d08eadcc3cacfdee7
 [![Project Status: Active – The project has reached a stable, usable
 state and is being actively
 developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
 [![MIT
 license](http://img.shields.io/badge/license-MIT-brightgreen.svg)](http://opensource.org/licenses/MIT)
 [![DOI](https://zenodo.org/badge/DOI/10.1016/j.jbi.2020.103474.svg)](https://doi.org/10.1016/j.jbi.2020.103474)
+
+**Authors:** [Jie Zhu](https://scholar.google.com/citations?user=Cw5v2f4AAAAJ&hl=en) and
+[Blanca Gallego](https://cbdrh.med.unsw.edu.au/people/associate-professor-blanca-gallego-luxan)
 
 This paper proposed a three-stage modular design for estimating the
 treatment effect heterogeneity in observational survival analysis. The
