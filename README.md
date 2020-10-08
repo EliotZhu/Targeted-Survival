@@ -1,5 +1,5 @@
 
-**title: Targeted estimation of heterogeneous treatment effect in observational survival
+# Targeted estimation of heterogeneous treatment effect in observational survival
   analysis
 
 >>>>>>> 61d5085a1ec749d7d9cd275d08eadcc3cacfdee7
