@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 
 **title: Targeted estimation of heterogeneous treatment effect in observational survival
   analysis
