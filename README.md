@@ -1,3 +1,10 @@
+<<<<<<< HEAD
+=======
+
+**title: Targeted estimation of heterogeneous treatment effect in observational survival
+  analysis
+
+>>>>>>> 61d5085a1ec749d7d9cd275d08eadcc3cacfdee7
 [![Project Status: Active – The project has reached a stable, usable
 state and is being actively
 developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
